@@ -83,3 +83,8 @@ func New(opts ...Option) (*Matcher, error) {
 
 	return &Matcher{embedder: cfg.embedder, index: cfg.index, minScore: cfg.minScore, maxRunes: cfg.maxRunes}, nil
 }
+
+// DefaultIndexBytes returns the raw bytes of this build's embedded default
+// index (data/index.bin or data/index_static.bin depending on build tag).
+// Exposed for `emojify index inspect`; not part of the Suggest/New surface.
+func DefaultIndexBytes() []byte { return defaultIndexData }
