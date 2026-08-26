@@ -3,9 +3,17 @@ package emojify
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 )
+
+//go:embed lexicons/me.byjp.emojify.suggestEmojis.json
+
+// LexiconJSON is the raw me.byjp.emojify.suggestEmojis lexicon document,
+// served by the server (server/server.go) and available to any other caller
+// that needs the schema without a network round-trip.
+var LexiconJSON []byte
 
 // Suggestion is one candidate emoji match.
 type Suggestion struct {
