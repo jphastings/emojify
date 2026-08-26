@@ -40,11 +40,14 @@ func loadGolden(t *testing.T) []goldenRow {
 
 // wantPassRate is the minimum fraction of non-informational golden rows this
 // build's embedder must place correctly. It's build-tag-specific: see
-// rank_test_onnx.go (Task 10) for the onnx value. If a real measurement
-// during implementation differs meaningfully from this floor, update the
-// constant to match reality and say so in the commit — the number matters
-// less than the harness reporting the truth.
-const wantPassRateStatic = 0.5
+// rank_test_onnx.go (Task 10) for the onnx value.
+//
+// Measured at 20% against the real static embedder (see the plan's ledger)
+// — this fallback embedder is documented as meaningfully worse than the
+// onnx build; the real quality bar is Task 10's onnx floor. If a future
+// change to the static embedder or its data measurably changes this number,
+// update the constant to match and say so in the commit — same as before.
+const wantPassRateStatic = 0.2
 
 func TestGoldenTable(t *testing.T) {
 	m, err := New()
