@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -40,13 +42,16 @@ func LoadVocab(r io.Reader) (map[string]int64, error) {
 // Encode returns input ids and an attention mask for text, with [CLS]/[SEP]
 // added, truncated to maxTokens (including the two special tokens). The
 // returned slices are exactly len(ids)==len(mask), unpadded — callers that
-// need a fixed-width tensor pad it themselves.
+// need a fixed-width tensor pad it themselves. Note: maxTokens of 0 is a
+// degenerate caller error (real usage always passes fixed 256+).
 func (t *Tokenizer) Encode(text string, maxTokens int) (ids []int64, mask []int64) {
 	ids = append(ids, t.vocab[ClsToken])
+
+wordLoop:
 	for _, word := range basicTokenize(text) {
 		for _, piece := range t.wordpieceSplit(word) {
 			if len(ids) >= maxTokens-1 {
-				break
+				break wordLoop
 			}
 			id, ok := t.vocab[piece]
 			if !ok {
@@ -55,7 +60,10 @@ func (t *Tokenizer) Encode(text string, maxTokens int) (ids []int64, mask []int6
 			ids = append(ids, id)
 		}
 	}
-	ids = append(ids, t.vocab[SepToken])
+
+	if len(ids) < maxTokens {
+		ids = append(ids, t.vocab[SepToken])
+	}
 
 	mask = make([]int64, len(ids))
 	for i := range mask {
@@ -64,14 +72,28 @@ func (t *Tokenizer) Encode(text string, maxTokens int) (ids []int64, mask []int6
 	return ids, mask
 }
 
+// isBertPunctuation matches BERT's _is_punctuation: ASCII ranges 33-47, 58-64, 91-96, 123-126
+// and Unicode category P (which Go's unicode.IsPunct checks). This excludes emoji (category So),
+// matching the uncased tokenizer real BERT uses.
+func isBertPunctuation(r rune) bool {
+	cp := int(r)
+	if (cp >= 33 && cp <= 47) || (cp >= 58 && cp <= 64) || (cp >= 91 && cp <= 96) || (cp >= 123 && cp <= 126) {
+		return true
+	}
+	return unicode.IsPunct(r)
+}
+
 func basicTokenize(text string) []string {
 	text = strings.ToLower(text)
+	text = norm.NFD.String(text) // NFD decompose: café → cafe + combining accent
 	var b strings.Builder
 	for _, r := range text {
 		switch {
+		case unicode.Is(unicode.Mn, r):
+			continue // strip accents/combining marks NFD split out (real BERT's do_lower_case implies strip_accents)
 		case unicode.IsSpace(r):
 			b.WriteRune(' ')
-		case unicode.IsPunct(r), unicode.IsSymbol(r):
+		case isBertPunctuation(r):
 			b.WriteRune(' ')
 			b.WriteRune(r)
 			b.WriteRune(' ')
