@@ -18,10 +18,10 @@ import (
 var errNoMatch = errors.New("no suggestion cleared --min-score")
 
 type suggestOptions struct {
-	limit     int
-	json      bool
-	scores    bool
-	minScore  float32
+	limit    int
+	json     bool
+	scores   bool
+	minScore float32
 }
 
 var suggestOpts suggestOptions
