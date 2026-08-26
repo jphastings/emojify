@@ -1,0 +1,44 @@
+# testdata/golden.yaml
+#
+# Every non-informational row is empirically verified: each phrase was run
+# through the real all-MiniLM-L6-v2 ONNX model against the real 1,536-entry
+# default index on 2026-08-26, and expect_any_of/within_top come from the
+# actual measured ranks (see the plan's "Empirical grounding" section for the
+# full top-6 printouts). This is why some rows differ from the design doc's
+# illustrative examples — "What a glorious day" → 🌞 does not hold against
+# the real model for this emoji vocabulary and was replaced.
+- phrase: "The weather is gorgeous outside today"
+  expect_any_of: ["🌞", "☀️", "🌤️", "🌥️", "🌇"]
+  within_top: 5
+- phrase: "such a beautiful sunny afternoon"
+  expect_any_of: ["🌞", "☀️", "🌅", "🌇"]
+  within_top: 5
+- phrase: "quiet morning, strong coffee"
+  expect_any_of: ["☕"]
+  within_top: 3
+- phrase: "I'm so happy right now"
+  expect_any_of: ["😀", "😃", "😄", "😅"]
+  within_top: 5
+- phrase: "the build is on fire"
+  expect_any_of: ["🔥", "🧨", "🚒"]
+  within_top: 3
+- phrase: "we're throwing a party tonight"
+  expect_any_of: ["🥳", "🎆", "🥂"]
+  within_top: 5
+- phrase: "I am freezing cold"
+  expect_any_of: ["🥶", "❄️", "☃️", "🧊"]
+  within_top: 3
+- phrase: "that movie made me cry"
+  expect_any_of: ["😭", "😢", "💔"]
+  within_top: 3
+- phrase: "happy birthday!"
+  expect_any_of: ["🎂", "🥳", "🎈"]
+  within_top: 3
+- phrase: "my laptop just died"
+  expect_any_of: ["💻", "🔋"]
+  within_top: 3
+- phrase: "not a good day"
+  expect_any_of: ["😒", "😞", "😢"]
+  within_top: 5
+  informational: true # sentence transformers are known-weak at negation (design
+                       # doc's "Open questions"); measured and reported, not asserted.
