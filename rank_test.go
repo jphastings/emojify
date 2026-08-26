@@ -4,10 +4,19 @@ package emojify
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
 )
+
+// stripVariationSelectors removes U+FE0F (VS16, emoji presentation) and
+// U+FE0E (VS15, text presentation) so golden.yaml's hand-typed emoji compare
+// equal to emojibase-data's canonical strings regardless of which form
+// either side happens to use.
+func stripVariationSelectors(s string) string {
+	return strings.NewReplacer("️", "", "︎", "").Replace(s)
+}
 
 type goldenRow struct {
 	Phrase        string   `yaml:"phrase"`
@@ -59,7 +68,7 @@ func TestGoldenTable(t *testing.T) {
 		hit := false
 		for _, want := range row.ExpectAnyOf {
 			for _, g := range got {
-				if g == want {
+				if stripVariationSelectors(g) == stripVariationSelectors(want) {
 					hit = true
 				}
 			}
