@@ -3,6 +3,7 @@ package emojify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -11,6 +12,11 @@ const (
 	rankTopK      = 20   // candidate pool size before MMR diversification
 	rankMMRLambda = 0.75 // relevance vs. diversity trade-off
 )
+
+// ErrTextTooLong is returned by Suggest when the input exceeds MaxRunes.
+// Callers that need to distinguish a client input error from an internal
+// failure (e.g. an embedding error) should check errors.Is(err, ErrTextTooLong).
+var ErrTextTooLong = errors.New("emojify: input exceeds MaxRunes")
 
 // Matcher is a loaded index + embedder pair. Safe for concurrent use.
 type Matcher struct {
@@ -31,7 +37,7 @@ func (m *Matcher) Suggest(ctx context.Context, text string, limit int) ([]Sugges
 		runeCount++
 	}
 	if runeCount > m.maxRunes {
-		return nil, fmt.Errorf("emojify: input is %d runes, exceeds MaxRunes %d", runeCount, m.maxRunes)
+		return nil, fmt.Errorf("%w: input is %d runes, exceeds MaxRunes %d", ErrTextTooLong, runeCount, m.maxRunes)
 	}
 
 	vecs, err := m.embedder.Embed(ctx, []string{text})

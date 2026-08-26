@@ -3,6 +3,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -50,7 +51,11 @@ func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 
 	suggestions, err := h.matcher.Suggest(r.Context(), text, limit)
 	if err != nil {
-		writeXRPCError(w, http.StatusBadRequest, "TextTooLong", err.Error())
+		if errors.Is(err, emojify.ErrTextTooLong) {
+			writeXRPCError(w, http.StatusBadRequest, "TextTooLong", err.Error())
+		} else {
+			writeXRPCError(w, http.StatusInternalServerError, "InternalError", "an internal error occurred")
+		}
 		return
 	}
 	if len(suggestions) == 0 {

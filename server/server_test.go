@@ -2,7 +2,10 @@
 package server
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -89,6 +92,55 @@ func TestHealthzRoute(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+}
+
+// erroringEmbedder simulates an internal/infra failure (e.g. a model error
+// or resource exhaustion) that is unrelated to input length, so tests can
+// verify handleSuggest doesn't mischaracterize it as TextTooLong.
+type erroringEmbedder struct{ dims int }
+
+func (e erroringEmbedder) Dims() int { return e.dims }
+func (e erroringEmbedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	return nil, errors.New("embedder: simulated failure")
+}
+
+func TestSuggestEmojisInternalError(t *testing.T) {
+	idx, err := emojify.ReadIndex(bytes.NewReader(emojify.DefaultIndexBytes()))
+	if err != nil {
+		t.Fatalf("ReadIndex: %v", err)
+	}
+	m, err := emojify.New(emojify.WithEmbedder(erroringEmbedder{dims: idx.Dims}))
+	if err != nil {
+		t.Fatalf("emojify.New: %v", err)
+	}
+	t.Cleanup(func() { m.Close() })
+
+	handler := New(m)
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis?text=hello")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+
+	var body struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decoding response: %v", err)
+	}
+	if body.Error != "InternalError" {
+		t.Errorf("error = %q, want %q (must not be mismapped to TextTooLong)", body.Error, "InternalError")
+	}
+	if body.Message == "embedder: simulated failure" || body.Message == "emojify: embedding input: embedder: simulated failure" {
+		t.Errorf("internal error message leaked embedder detail: %q", body.Message)
 	}
 }
 
