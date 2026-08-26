@@ -4,8 +4,10 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jphastings/emojify"
 )
@@ -20,19 +22,31 @@ type handler struct {
 }
 
 // New builds the emojify HTTP handler: the XRPC query, health checks, and
-// the lexicon document. Task 12 adds CORS/rate-limiting/concurrency-bounding
-// middleware around this handler; it is not safety-hardened on its own.
+// the lexicon document, wrapped in CORS/rate-limiting/max-bytes/bounded-
+// concurrency middleware.
 func New(matcher *emojify.Matcher) http.Handler {
+	return newWithLimits(matcher, defaultLimitConfig)
+}
+
+func newWithLimits(matcher *emojify.Matcher, cfg limitConfig) http.Handler {
 	h := &handler{matcher: matcher}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /xrpc/me.byjp.emojify.suggestEmojis", h.handleSuggest)
 	mux.HandleFunc("GET /healthz", h.handleHealthz)
 	mux.HandleFunc("GET /xrpc/_health", h.handleXRPCHealth)
 	mux.HandleFunc("GET /lexicons/me.byjp.emojify.suggestEmojis.json", h.handleLexicon)
-	return mux
+
+	var wrapped http.Handler = mux
+	wrapped = withBoundedConcurrency(wrapped)
+	wrapped = withMaxBytes(wrapped)
+	wrapped = withRateLimit(cfg, wrapped)
+	wrapped = withCORS(wrapped)
+	return wrapped
 }
 
 func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	text := r.URL.Query().Get("text")
 	if text == "" {
 		writeXRPCError(w, http.StatusBadRequest, "InvalidRequest", "text parameter is required")
@@ -67,6 +81,12 @@ func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 	for i, s := range suggestions {
 		out[i] = suggestion{Emoji: s.Emoji, Name: s.Name, Score: toBasisPoints(s.Score)}
 	}
+
+	emojis := make([]string, len(out))
+	for i, s := range out {
+		emojis[i] = s.Emoji
+	}
+	log.Printf("suggestEmojis: %v (%s)", emojis, time.Since(start))
 
 	w.Header().Set("Content-Type", "application/json")
 	writeJSON(w, suggestEmojisResponse{Suggestions: out})
