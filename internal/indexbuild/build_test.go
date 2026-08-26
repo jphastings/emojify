@@ -82,3 +82,18 @@ func TestBuildIndexAppliesPenalty(t *testing.T) {
 		t.Errorf("sun penalty = %v, want 1.0 (distinct direction, not generic)", p)
 	}
 }
+
+func TestBuildIndexRejectsEmptyNeutralCorpus(t *testing.T) {
+	blobs := []Blob{
+		{Emoji: "🌞", Label: "sun with face", Group: "travel-places", Subgroup: "sky-weather", Text: "sun with face. bright, sun. travel-places, sky-weather."},
+	}
+
+	var buf bytes.Buffer
+	err := BuildIndex(context.Background(), &buf, fakeEmbedder{}, "fake-model", blobs, []string{}, 1.0, 0.85)
+	if err == nil {
+		t.Fatal("BuildIndex with empty neutralCorpus should error, got nil")
+	}
+	if err.Error() != "indexbuild: neutralCorpus must not be empty" {
+		t.Errorf("BuildIndex error = %q, want %q", err.Error(), "indexbuild: neutralCorpus must not be empty")
+	}
+}

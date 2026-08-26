@@ -28,6 +28,10 @@ func BuildIndex(
 	penaltyThresholdSigma float64,
 	penaltyMultiplier float32,
 ) error {
+	if len(neutralCorpus) == 0 {
+		return fmt.Errorf("indexbuild: neutralCorpus must not be empty")
+	}
+
 	texts := make([]string, len(blobs))
 	for i, b := range blobs {
 		texts[i] = b.Text
@@ -56,7 +60,12 @@ func BuildIndex(
 	}
 	n := float64(len(means))
 	mu := sum / n
-	sigma := math.Sqrt(sumSq/n - mu*mu)
+	variance := sumSq/n - mu*mu
+	// Clamp to 0 to prevent NaN from floating-point cancellation
+	if variance < 0 {
+		variance = 0
+	}
+	sigma := math.Sqrt(variance)
 	threshold := mu + penaltyThresholdSigma*sigma
 
 	metas := make([]emojify.Metadata, len(blobs))
