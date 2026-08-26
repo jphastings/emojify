@@ -44,7 +44,7 @@ var indexInspectCmd = &cobra.Command{
 
 func init() {
 	indexBuildCmd.Flags().BoolVar(&indexIncludeFlags, "include-flags", false, "include country/region flag emoji")
-	indexBuildCmd.Flags().StringVar(&indexOutPath, "out", "data/index.bin", "output path for the built index")
+	indexBuildCmd.Flags().StringVar(&indexOutPath, "out", emojify.DefaultIndexPath, "output path for the built index")
 	indexCmd.AddCommand(indexBuildCmd, indexInspectCmd)
 	rootCmd.AddCommand(indexCmd)
 }
