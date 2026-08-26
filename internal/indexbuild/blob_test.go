@@ -11,10 +11,10 @@ func TestBuildBlobsFiltering(t *testing.T) {
 	}
 	entries := []RawEmoji{
 		{Label: "sun with face", Emoji: "🌞", Tags: []string{"bright", "sun"}, Group: intPtr(5), Subgroup: intPtr(59)},
-		{Label: "regional indicator A", Emoji: "🇦", Group: nil, Subgroup: nil}, // no group: excluded
-		{Label: "light skin tone", Emoji: "🏻", Group: intPtr(2), Subgroup: nil}, // component: excluded
-		{Label: "man surfing", Emoji: "🏄‍♂️", Group: intPtr(1), Subgroup: intPtr(28), Gender: intPtr(1)}, // gendered: excluded
-		{Label: "person surfing", Emoji: "🏄", Group: intPtr(1), Subgroup: intPtr(28)},                     // base: kept
+		{Label: "regional indicator A", Emoji: "🇦", Group: nil, Subgroup: nil},                                            // no group: excluded
+		{Label: "light skin tone", Emoji: "🏻", Group: intPtr(2), Subgroup: nil},                                           // component: excluded
+		{Label: "man surfing", Emoji: "🏄‍♂️", Group: intPtr(1), Subgroup: intPtr(28), Gender: intPtr(1)},                  // gendered: excluded
+		{Label: "person surfing", Emoji: "🏄", Group: intPtr(1), Subgroup: intPtr(28)},                                     // base: kept
 		{Label: "flag: United States", Emoji: "🇺🇸", Tags: []string{"US", "flag"}, Group: intPtr(9), Subgroup: intPtr(98)}, // flag: excluded by default
 	}
 
