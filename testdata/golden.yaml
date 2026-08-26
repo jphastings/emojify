@@ -1,10 +1,12 @@
 # testdata/golden.yaml
 #
-# Every non-informational row is empirically verified: each phrase was run
-# through the real all-MiniLM-L6-v2 ONNX model against the real 1,536-entry
-# default index on 2026-08-26, and expect_any_of/within_top come from the
-# actual measured ranks (see the plan's "Empirical grounding" section for the
-# full top-6 printouts). This is why some rows differ from the design doc's
+# Every row here (including the informational one) is empirically verified:
+# each phrase was run through the real all-MiniLM-L6-v2 ONNX model against
+# the real 1,536-entry default index on 2026-08-26, and expect_any_of/
+# within_top come from the actual measured ranks. The full top-6 printout
+# behind every row lives in the "Empirical grounding" bullet under Global
+# Constraints in docs/superpowers/plans/2026-08-26-emojify.md — not
+# duplicated here. This is why some rows differ from the design doc's
 # illustrative examples — "What a glorious day" → 🌞 does not hold against
 # the real model for this emoji vocabulary and was replaced.
 - phrase: "The weather is gorgeous outside today"
