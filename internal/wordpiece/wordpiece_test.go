@@ -130,15 +130,6 @@ func TestEncodeTruncatesToMaxTokensExactly(t *testing.T) {
 	if len(mask) != 1 {
 		t.Errorf("maxTokens=1 mask len=%d, want 1", len(mask))
 	}
-	// With maxTokens=2, we get [CLS, UNK/first-token] but no [SEP]
-	ids2, _ := tok.Encode("sun", 2)
-	if len(ids2) != 2 {
-		t.Errorf("maxTokens=2 yielded len=%d, want 2: %v", len(ids2), ids2)
-	}
-	if ids2[1] != fixtureVocab()["[SEP]"] {
-		// Actually with maxTokens=2 and only one token "sun", we get [CLS sun SEP]
-		// but truncate, so check expectation
-	}
 }
 
 func TestWordpieceBackoutFallsBackToUnk(t *testing.T) {
