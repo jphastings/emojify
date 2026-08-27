@@ -62,6 +62,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # goreleaser's .Version template (used for the binaries) strips the
+      # tag's leading "v"; match that here so the image reports the same
+      # version string.
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       # Deterministic per-arch tag, not meant for users — the
       # docker-manifest job below combines these into the real, published
       # tags and is the only thing that needs to find them again.
@@ -70,6 +76,8 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:build-${{ github.sha }}-${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
 
   docker-manifest:
     name: Publish multi-arch manifest (ghcr.io)

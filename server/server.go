@@ -93,22 +93,22 @@ func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("suggestEmojis: %v (%s)", emojis, time.Since(start))
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	writeJSON(w, suggestEmojisResponse{Suggestions: out})
 }
 
 func (h *handler) handleHealthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	writeJSON(w, map[string]any{"status": "ok"})
 }
 
 func (h *handler) handleXRPCHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	writeJSON(w, map[string]string{"version": Version})
 }
 
 func (h *handler) handleLexicon(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	w.Write(emojify.LexiconJSON)
 }
 

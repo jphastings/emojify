@@ -30,7 +30,10 @@ RUN set -eux; \
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=1 go build -tags onnx -o /out/emojify ./cmd/emojify
+# Defaults to "dev" for a plain `docker build`, matching main.go's own
+# fallback — release.yml passes the real tag via --build-arg.
+ARG VERSION=dev
+RUN CGO_ENABLED=1 go build -tags onnx -ldflags "-s -w -X main.version=${VERSION}" -o /out/emojify ./cmd/emojify
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*

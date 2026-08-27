@@ -6,6 +6,13 @@ import (
 	"net/http"
 )
 
+// jsonContentType declares the charset explicitly: JSON is always UTF-8 per
+// RFC 8259 regardless of what the header says, but a bare "application/json"
+// (no charset param) leaves some browsers' raw-response viewers to guess —
+// and they don't always guess UTF-8, mangling any non-ASCII byte (every
+// emoji this API returns) into mojibake.
+const jsonContentType = "application/json; charset=utf-8"
+
 type xrpcError struct {
 	Error   string `json:"error"`
 	Message string `json:"message"`
@@ -14,7 +21,7 @@ type xrpcError struct {
 // writeXRPCError writes the XRPC error envelope (not Go's default error
 // shape) so no handler hand-rolls this format.
 func writeXRPCError(w http.ResponseWriter, status int, name, message string) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", jsonContentType)
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(xrpcError{Error: name, Message: message})
 }

@@ -157,7 +157,7 @@ func TestLexiconRoute(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
-	if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
-		t.Errorf("content-type = %q, want application/json", ct)
+	if ct := resp.Header.Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Errorf("content-type = %q, want application/json; charset=utf-8", ct)
 	}
 }
