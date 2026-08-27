@@ -41,9 +41,13 @@ Exit codes: `0` output produced, `1` error, `2` nothing cleared `--min-score`.
 
 ## Rebuild the index
 
-    go run -tags onnx ./cmd/emojify index build          # data/index.bin
-    go run ./cmd/emojify index build --out data/index_static.bin  # data/index_static.bin
-    go run ./cmd/emojify index inspect 🌞                  # blob + nearest neighbours
+    go run -tags onnx ./cmd/emojify index build   # -> data/index.bin
+    go run ./cmd/emojify index build              # -> data/index_static.bin
+    go run ./cmd/emojify index inspect 🌞          # blob + nearest neighbours
+
+`--out` defaults to whichever index the active build tag actually embeds, so
+each build regenerates its own; `--include-flags` adds country/region flags.
+Both indexes are committed artefacts — rebuild deliberately, then commit.
 
 ## Docker
 
@@ -105,11 +109,38 @@ run the same command there:
 `GET /xrpc/me.byjp.emojify.suggestEmojis?text=...&limit=3` — see
 `lexicons/me.byjp.emojify.suggestEmojis.json` for the full schema (served at
 `GET /lexicons/me.byjp.emojify.suggestEmojis.json`). Also: `GET /healthz`,
-`GET /xrpc/_health`.
+`GET /xrpc/_health`, and a small demo page at `GET /`.
+
+`score` is an integer 0–1000 (per-mille, *not* basis points), and is a
+similarity adjusted by a generic-emoji penalty rather than a raw cosine.
 
 The endpoint is open/anonymous by design (no auth) but rate-limited per-IP
 and bounded in concurrency — see `server/limits.go`. Requests are logged by
 result and latency only; input text is never logged.
+
+## Limits and caveats
+
+- **Input is capped at 600 characters** (counted in Unicode code points, not
+  grapheme clusters — a ZWJ emoji counts as several). Over that is rejected
+  with `TextTooLong`.
+- **The model reads at most 256 tokens** — roughly 1300 characters of ordinary
+  English, far fewer for punctuation-dense text. Beyond that the tail is
+  *ignored*, not rejected.
+- **Long, unfocused text gives generic answers.** Coherent on-topic text works
+  well past 450 characters, but a single interesting sentence buried in neutral
+  prose washes out: mean-pooling pulls the embedding toward the average and
+  generic emoji win. Short and focused beats long and vague.
+- **English only.** CJK input largely tokenizes to `[UNK]`, and emoji in the
+  input are effectively ignored.
+- **Negation is weak** — "not a good day" embeds close to "a good day". A known
+  sentence-transformer limitation, tracked by an unasserted row in
+  `testdata/golden.yaml`.
+
+## Contributing
+
+See [CLAUDE.md](CLAUDE.md) for the non-obvious parts — build tags, the ONNX
+Runtime version floor and library-path handling, test setup per package, and
+why the release pipeline avoids QEMU.
 
 ## License
 
