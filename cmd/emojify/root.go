@@ -69,6 +69,7 @@ func registerSuggestFlags(fs *pflag.FlagSet) {
 }
 
 func init() {
+	rootCmd.Version = version
 	registerSuggestFlags(rootCmd.Flags())
 }
 

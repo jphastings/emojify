@@ -17,6 +17,11 @@ const (
 	maxLimit     = 5
 )
 
+// Version is reported by GET /xrpc/_health. The CLI sets this from its own
+// build-time version (see cmd/emojify/main.go); a direct library caller can
+// set it too, and it defaults to "dev" like the CLI's own fallback.
+var Version = "dev"
+
 type handler struct {
 	matcher *emojify.Matcher
 }
@@ -99,7 +104,7 @@ func (h *handler) handleHealthz(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) handleXRPCHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	writeJSON(w, map[string]string{"version": "0.1.0"})
+	writeJSON(w, map[string]string{"version": Version})
 }
 
 func (h *handler) handleLexicon(w http.ResponseWriter, r *http.Request) {

@@ -35,6 +35,8 @@ func runServer(addr string) error {
 	}
 	defer matcher.Close()
 
+	server.Version = version
+
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           server.New(matcher),
