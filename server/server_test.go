@@ -52,7 +52,7 @@ func TestSuggestEmojisRoute(t *testing.T) {
 	}
 	for _, s := range body.Suggestions {
 		if s.Score < 0 || s.Score > 1000 {
-			t.Errorf("score %d out of basis-point range [0,1000]", s.Score)
+			t.Errorf("score %d out of per-mille range [0,1000]", s.Score)
 		}
 	}
 }

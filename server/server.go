@@ -79,7 +79,7 @@ func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 
 	out := make([]suggestion, len(suggestions))
 	for i, s := range suggestions {
-		out[i] = suggestion{Emoji: s.Emoji, Name: s.Name, Score: toBasisPoints(s.Score)}
+		out[i] = suggestion{Emoji: s.Emoji, Name: s.Name, Score: toPerMille(s.Score)}
 	}
 
 	emojis := make([]string, len(out))

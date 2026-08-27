@@ -19,7 +19,7 @@ var LexiconJSON []byte
 type Suggestion struct {
 	Emoji string  `json:"emoji"`
 	Name  string  `json:"name"`
-	Score float32 `json:"score"` // cosine similarity, 0..1
+	Score float32 `json:"score"` // cosine similarity adjusted by a generic-emoji penalty (see rank.go), 0..1
 }
 
 type config struct {
@@ -48,7 +48,9 @@ func WithIndex(r io.Reader) Option {
 	}
 }
 
-// WithMinScore drops matches below this cosine similarity rather than padding the result.
+// WithMinScore drops matches below this score (cosine similarity adjusted by
+// the per-emoji generic-match penalty — see Suggestion.Score) rather than
+// padding the result.
 func WithMinScore(s float32) Option { return func(c *config) { c.minScore = s } }
 
 // WithMaxRunes overrides the default 300-rune input limit.

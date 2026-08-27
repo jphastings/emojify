@@ -13,7 +13,7 @@
             "type": "string",
             "maxGraphemes": 300,
             "maxLength": 1200,
-            "description": "The passage of text to match, up to 300 graphemes. maxLength is in UTF-8 bytes, not graphemes — emoji-laden input can run up to 4 bytes per grapheme."
+            "description": "The passage of text to match, up to 300 units. Despite the maxGraphemes field name, the limit is actually enforced in Unicode code points (runes), not user-perceived graphemes — a single multi-rune grapheme cluster (e.g. a ZWJ family emoji) counts as multiple units toward it. maxLength is in UTF-8 bytes, not runes — emoji-laden input can run up to 4 bytes per rune."
           },
           "limit": {
             "type": "integer",
@@ -38,8 +38,10 @@
         }
       },
       "errors": [
-        { "name": "TextTooLong", "description": "text exceeds the 300-grapheme limit." },
-        { "name": "NoMatch", "description": "no suggestion cleared the minimum score." }
+        { "name": "TextTooLong", "description": "text exceeds the 300-unit limit (counted in Unicode code points/runes, not graphemes)." },
+        { "name": "NoMatch", "description": "no suggestion cleared the minimum score." },
+        { "name": "RateLimitExceeded", "description": "too many requests from this client; slow down and retry." },
+        { "name": "Overloaded", "description": "the server is at capacity and shed this request; retry after a short delay." }
       ]
     },
     "suggestion": {
@@ -52,7 +54,7 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Cosine similarity in basis points (0-1000). Divide by 1000 for the 0..1 float value used internally — this is an integer because the lexicon primitive set has no float type."
+          "description": "A similarity score — cosine similarity between the query and this emoji's meaning, adjusted by a per-emoji penalty that suppresses generically-matching emoji — expressed in per-mille (parts per thousand, 0-1000). This is not basis points (which would be parts per ten-thousand). Divide by 1000 for the 0..1 float value used internally — this is an integer because the lexicon primitive set has no float type."
         }
       }
     }
