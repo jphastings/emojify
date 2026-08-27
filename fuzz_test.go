@@ -14,8 +14,8 @@ func FuzzSuggestInputHandling(f *testing.F) {
 	seeds := []string{
 		"🔥🔥🔥",
 		"👨‍👩‍👧‍👦", // ZWJ family sequence
-		"مرحبا بك في هذا اليوم الجميل",       // Arabic, RTL
-		"שלום לכם ביום נפלא זה",              // Hebrew, RTL
+		"مرحبا بك في هذا اليوم الجميل", // Arabic, RTL
+		"שלום לכם ביום נפלא זה",        // Hebrew, RTL
 		string(makeCombiningRunes(300)),
 		"",
 		" ",

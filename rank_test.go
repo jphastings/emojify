@@ -38,7 +38,6 @@ func loadGolden(t *testing.T) []goldenRow {
 	return rows
 }
 
-
 func TestGoldenTable(t *testing.T) {
 	m, err := New()
 	if err != nil {
