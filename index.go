@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 )
 
 const (
@@ -131,19 +132,24 @@ func ReadIndex(r io.Reader) (*Index, error) {
 	}
 	count := int(count32)
 
+	// Reads each vector's scale+components block with a single io.ReadFull
+	// into a reused byte slice, decoding in memory, rather than one
+	// binary.Read call per int8 component: at 384 dims x 1536 entries that's
+	// hundreds of thousands of individual reads, measured at ~20ms on a
+	// modern Mac and a meaningful fraction of a second on Pi Zero 2 W class
+	// hardware — paid at every process start since the CLI is a one-shot
+	// process.
+	blockSize := 4 + dims // scale (float32) + dims x int8 components
+	block := make([]byte, blockSize)
 	vectors := make([]float32, count*dims)
 	for i := 0; i < count; i++ {
-		var scale float32
-		if err := binary.Read(br, binary.LittleEndian, &scale); err != nil {
+		if _, err := io.ReadFull(br, block); err != nil {
 			return nil, err
 		}
+		scale := math.Float32frombits(binary.LittleEndian.Uint32(block[:4]))
 		row := vectors[i*dims : (i+1)*dims]
 		for j := 0; j < dims; j++ {
-			var q int8
-			if err := binary.Read(br, binary.LittleEndian, &q); err != nil {
-				return nil, err
-			}
-			row[j] = float32(q) * scale
+			row[j] = float32(int8(block[4+j])) * scale
 		}
 	}
 
