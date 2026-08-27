@@ -33,11 +33,20 @@ COPY . .
 RUN CGO_ENABLED=1 go build -tags onnx -o /out/emojify ./cmd/emojify
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/lib/libonnxruntime.so* /usr/local/lib/
 RUN ldconfig
 COPY --from=build /out/emojify /usr/local/bin/emojify
-COPY data/model.onnx data/vocab.txt /app/data/
+# Fetched here rather than COPY'd from the host: data/model.onnx and
+# data/vocab.txt are gitignored (scripts/fetch-onnx-model.sh, run locally,
+# populates them for a dev build) — a platform building straight from this
+# git repo (Railway, a fresh clone, CI) has neither file, so COPY would fail
+# with "not found". Same pinned source as that script; keep both in sync.
+RUN mkdir -p /app/data \
+    && curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx" \
+        -o /app/data/model.onnx \
+    && curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt" \
+        -o /app/data/vocab.txt
 ENV EMOJIFY_MODEL_PATH=/app/data/model.onnx
 # embedder_onnx.go's default lookup path is the Linux-packaged /usr/lib
 # location; ldconfig alone doesn't help since the app dlopen()s an absolute
