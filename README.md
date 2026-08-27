@@ -106,9 +106,9 @@ run the same command there:
 
 ## Server
 
-`GET /xrpc/me.byjp.emojify.suggestEmojis?text=...&limit=3` — see
-`lexicons/me.byjp.emojify.suggestEmojis.json` for the full schema (served at
-`GET /lexicons/me.byjp.emojify.suggestEmojis.json`). Also: `GET /healthz`,
+`GET /xrpc/me.byjp.emojify.suggestEmoji?text=...&limit=3` — see
+`lexicons/me/byjp/emojify/suggestEmoji.json` for the full schema (served at
+`GET /lexicons/me.byjp.emojify.suggestEmoji.json`). Also: `GET /healthz`,
 `GET /xrpc/_health`, and a small demo page at `GET /`.
 
 `score` is an integer 0–1000 (per-mille, *not* basis points), and is a

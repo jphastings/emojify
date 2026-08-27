@@ -39,10 +39,10 @@ func newWithLimits(matcher *emojify.Matcher, cfg limitConfig) http.Handler {
 	// "/{$}" matches the root path *exactly*; a bare "GET /" would instead
 	// act as a catch-all and serve this page for every unmatched path.
 	mux.HandleFunc("GET /{$}", h.handleIndex)
-	mux.HandleFunc("GET /xrpc/me.byjp.emojify.suggestEmojis", h.handleSuggest)
+	mux.HandleFunc("GET /xrpc/me.byjp.emojify.suggestEmoji", h.handleSuggest)
 	mux.HandleFunc("GET /healthz", h.handleHealthz)
 	mux.HandleFunc("GET /xrpc/_health", h.handleXRPCHealth)
-	mux.HandleFunc("GET /lexicons/me.byjp.emojify.suggestEmojis.json", h.handleLexicon)
+	mux.HandleFunc("GET /lexicons/me.byjp.emojify.suggestEmoji.json", h.handleLexicon)
 
 	var wrapped http.Handler = mux
 	wrapped = withBoundedConcurrency(wrapped)
@@ -94,10 +94,10 @@ func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 	for i, s := range out {
 		emojis[i] = s.Emoji
 	}
-	log.Printf("suggestEmojis: %v (%s)", emojis, time.Since(start))
+	log.Printf("suggestEmoji: %v (%s)", emojis, time.Since(start))
 
 	w.Header().Set("Content-Type", jsonContentType)
-	writeJSON(w, suggestEmojisResponse{Suggestions: out})
+	writeJSON(w, suggestEmojiResponse{Suggestions: out})
 }
 
 func (h *handler) handleHealthz(w http.ResponseWriter, r *http.Request) {

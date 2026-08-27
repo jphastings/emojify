@@ -8,9 +8,9 @@ import (
 	"io"
 )
 
-//go:embed lexicons/me.byjp.emojify.suggestEmojis.json
+//go:embed lexicons/me/byjp/emojify/suggestEmoji.json
 
-// LexiconJSON is the raw me.byjp.emojify.suggestEmojis lexicon document,
+// LexiconJSON is the raw me.byjp.emojify.suggestEmoji lexicon document,
 // served by the server (server/server.go) and available to any other caller
 // that needs the schema without a network round-trip.
 var LexiconJSON []byte

@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "me.byjp.emojify.suggestEmojis",
+  "id": "me.byjp.emojify.suggestEmoji",
   "defs": {
     "main": {
       "type": "query",

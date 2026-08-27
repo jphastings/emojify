@@ -15,7 +15,7 @@ func TestCORSHeaderOnXRPCRoute(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis?text=hello+there")
+	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestRateLimitReturns429WhenExceeded(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	url := srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis?text=hello+there"
+	url := srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there"
 	first, err := http.Get(url)
 	if err != nil {
 		t.Fatalf("GET: %v", err)
@@ -85,7 +85,7 @@ func TestRateLimitConcurrentBurstFromSameIP(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				req := httptest.NewRequest(http.MethodGet, "/xrpc/me.byjp.emojify.suggestEmojis?text=hello+there", nil)
+				req := httptest.NewRequest(http.MethodGet, "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there", nil)
 				req.RemoteAddr = fmt.Sprintf("203.0.113.%d:12345", attempt) // same simulated client IP within an attempt, unique across attempts
 				rec := httptest.NewRecorder()
 				<-start

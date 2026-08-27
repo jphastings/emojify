@@ -32,7 +32,7 @@ type suggestion struct {
 	Score int    `json:"score"` // per-mille (parts per thousand), 0-1000
 }
 
-type suggestEmojisResponse struct {
+type suggestEmojiResponse struct {
 	Suggestions []suggestion `json:"suggestions"`
 }
 

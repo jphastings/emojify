@@ -24,12 +24,12 @@ func newTestMatcher(t *testing.T) *emojify.Matcher {
 	return m
 }
 
-func TestSuggestEmojisRoute(t *testing.T) {
+func TestSuggestEmojiRoute(t *testing.T) {
 	handler := New(newTestMatcher(t))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis?text=such+a+beautiful+sunny+afternoon&limit=3")
+	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=such+a+beautiful+sunny+afternoon&limit=3")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -58,12 +58,12 @@ func TestSuggestEmojisRoute(t *testing.T) {
 	}
 }
 
-func TestSuggestEmojisMissingText(t *testing.T) {
+func TestSuggestEmojiMissingText(t *testing.T) {
 	handler := New(newTestMatcher(t))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis")
+	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -106,7 +106,7 @@ func (e erroringEmbedder) Embed(ctx context.Context, texts []string) ([][]float3
 	return nil, errors.New("embedder: simulated failure")
 }
 
-func TestSuggestEmojisInternalError(t *testing.T) {
+func TestSuggestEmojiInternalError(t *testing.T) {
 	idx, err := emojify.ReadIndex(bytes.NewReader(emojify.DefaultIndexBytes()))
 	if err != nil {
 		t.Fatalf("ReadIndex: %v", err)
@@ -121,7 +121,7 @@ func TestSuggestEmojisInternalError(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmojis?text=hello")
+	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestLexiconRoute(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/lexicons/me.byjp.emojify.suggestEmojis.json")
+	resp, err := http.Get(srv.URL + "/lexicons/me.byjp.emojify.suggestEmoji.json")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}

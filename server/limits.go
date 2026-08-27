@@ -106,7 +106,7 @@ func withBoundedConcurrencyLimits(workers int, queueWait time.Duration, next htt
 	})
 }
 
-const maxRequestBodyBytes = 4096 // suggestEmojis is a GET with no real body; this is a defensive ceiling, not a real limit
+const maxRequestBodyBytes = 4096 // suggestEmoji is a GET with no real body; this is a defensive ceiling, not a real limit
 
 func withMaxBytes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

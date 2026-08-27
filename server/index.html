@@ -302,7 +302,7 @@
 
     <section>
       <h2>XRPC endpoint</h2>
-<pre><code><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmojis?text=Awesome&amp;limit=1</code></pre>
+<pre><code><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmoji?text=Awesome&amp;limit=1</code></pre>
     </section>
   </div>
 
@@ -366,7 +366,7 @@
     say("");
     try {
       var res = await fetch(
-        "/xrpc/me.byjp.emojify.suggestEmojis?limit=1&text=" + encodeURIComponent(text)
+        "/xrpc/me.byjp.emojify.suggestEmoji?limit=1&text=" + encodeURIComponent(text)
       );
       var body = await res.json().catch(function () { return {}; });
       if (res.ok && body.suggestions && body.suggestions.length) {
