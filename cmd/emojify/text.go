@@ -15,5 +15,6 @@ var textCmd = &cobra.Command{
 }
 
 func init() {
+	registerSuggestFlags(textCmd.Flags())
 	rootCmd.AddCommand(textCmd)
 }
