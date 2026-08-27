@@ -87,8 +87,12 @@ homebrew_casks:
       owner: jphastings
       name: homebrew-tools
       branch: main
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
+      # `index .Env "…"` rather than `.Env.…`: the latter is a hard error
+      # when the variable is absent entirely (rather than set-but-empty),
+      # which is the normal case for a local `--snapshot` build and for CI's
+      # snapshot job. `index` yields "" instead, so the skip below engages.
+      token: '{{ index .Env "HOMEBREW_TAP_TOKEN" }}'
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_TOKEN" }}false{{ else }}true{{ end }}'
     directory: Casks
     binaries:
       - emojify
