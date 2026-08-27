@@ -18,17 +18,16 @@ native dependency, the only option on an ARMv6 original Pi Zero):
 
 ## Install
 
+    brew install jphastings/tools/emojify                      # macOS
     go install github.com/jphastings/emojify/cmd/emojify@latest
 
-This gives the pure-Go embedder — small and dependency-free, but less sharp on
-subtle phrasing than the ONNX model. For that, run the container (see Docker
-below) or build with `-tags onnx`.
+Both ship the pure-Go embedder: small, dependency-free, and less sharp on
+subtle phrasing than the ONNX model. For that one, run the container (see
+Docker below) or build with `-tags onnx`.
 
-A Homebrew cask (`brew install jphastings/tools/emojify`) is configured but
-**not live yet** — it starts publishing on the first release after the tap's
-GitHub App is set up. See
-[docs/homebrew-tap-setup.md](docs/homebrew-tap-setup.md) for the remaining
-manual steps.
+The cask is published to [jphastings/homebrew-tools](https://github.com/jphastings/homebrew-tools)
+on each release — see [docs/homebrew-tap-setup.md](docs/homebrew-tap-setup.md)
+for how that's wired up.
 
 ## Run
 

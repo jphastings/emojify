@@ -13,9 +13,10 @@ built-in `GITHUB_TOKEN` cannot do — that token is scoped to this repo only.
 The usual workaround is a long-lived Personal Access Token stored as a secret.
 We're deliberately not doing that; this uses a **GitHub App** instead.
 
-**Status: not yet wired up.** The code in this repo is already written and
-gated, so tagging a release today succeeds and simply doesn't push the cask.
-Completing the steps below switches it on with no further code changes.
+**Status: live.** The App is created and installed, the credentials are in
+this repo, and releases publish the cask. The steps below are kept as the
+record of how it was set up — and as the recipe for pointing another project
+at the same tap (see "Reusing this App" at the end).
 
 ---
 
@@ -27,7 +28,7 @@ Completing the steps below switches it on with no further code changes.
 | Tied to | A person's account — dies when they leave, inherits their access | The App itself |
 | Scope | Whatever repos the PAT lists | Only repos the App is *installed* on |
 | Rotation | Manual, and easy to forget | Only the App private key, rotated rarely |
-| Audit trail | Shows as the person | Shows as the App (`emojify-release[bot]`) |
+| Audit trail | Shows as the person | Shows as the App (`<app-name>[bot]`) |
 
 The App still needs two secrets in this repo, but they mint short-lived,
 narrowly-scoped tokens rather than *being* a broad standing credential.
@@ -44,8 +45,10 @@ in the codebase needs to change.
 <https://github.com/settings/apps/new> (a personal-account App is fine; these
 are both personal repos).
 
-- **Name**: `emojify-release` (must be globally unique — adjust if taken; the
-  name only shows up as the commit author in the tap)
+- **Name**: something tap-scoped rather than project-scoped —
+  `jphastings-homebrew-publisher`, say. Must be globally unique. The App is
+  installed on the *tap*, not on any one project, so a project-specific name
+  ages badly the moment a second tool uses it.
 - **Homepage URL**: `https://github.com/jphastings/emojify`
 - **Webhook**: untick **Active**. This App never receives events.
 - **Repository permissions** → **Contents: Read and write**.
@@ -100,7 +103,8 @@ $ echo "happy birthday!" | emojify
 🥳
 ```
 
-A new `Casks/emojify.rb` should appear in the tap, authored by the App.
+A new `Casks/emojify.rb` should appear in the tap — pushed by the App (that's
+what the audit log shows), with the commit itself authored by `goreleaserbot`.
 
 ---
 
@@ -127,10 +131,43 @@ A new `Casks/emojify.rb` should appear in the tap, authored by the App.
 - **The cask ships the pure-Go model.** GoReleaser builds with `CGO_ENABLED=0`
   and no `onnx` tag, so `brew install` gets the small, dependency-free
   embedder — noticeably less sharp than the ONNX model the container runs.
-  The cask's `caveats` says so on install.
+  The cask's `caveats` points at the container without labouring the point.
 - **Quarantine.** These binaries aren't signed or notarized, so the cask has a
   `postflight` hook clearing `com.apple.quarantine`; without it Gatekeeper
   blocks the binary on first run.
-- **Other repos.** The same App can be installed for other tools that publish
-  to this tap — install it on their repos too and add the same variable/secret
-  pair there. One App, many publishers, still only tap write access.
+## Reusing this App for another project
+
+The App needs **no changes** to serve a second tool — it's installed on the
+*tap* (the destination), and doesn't care which repo calls it. Per new project:
+
+1. Add the same two values to that repo: `HOMEBREW_TAP_APP_ID` (variable) and
+   `HOMEBREW_TAP_APP_PRIVATE_KEY` (secret).
+2. Copy the `tap-token` step from this repo's `.github/workflows/release.yml`.
+3. Give it a `homebrew_casks:` block in its own `.goreleaser.yaml`.
+
+Do **not** install the App on the source repos — only on the tap. The source
+repo needs the App's *credentials*, not an installation of its own.
+
+### Why the credentials must be repeated
+
+GitHub Actions secrets exist at repository, environment, and **organization**
+level — and organization-level is exactly that: organizations only. These are
+personal (`jphastings/*`) repos, so there is no shared vault; the two values
+have to be added per repo. The only way around it is moving the repos into a
+GitHub organization, which is almost certainly not worth it for a handful of
+tools.
+
+### Reducing the copy-paste
+
+By the third or fourth publisher, extract the release job into a **reusable
+workflow** (`on: workflow_call`) in a shared repo and have each project call
+it with `secrets: inherit`. That removes the duplicated YAML — but note it
+does *not* remove the duplicated secrets, since `inherit` passes the *calling*
+repo's secrets, which still have to exist there.
+
+### Keep `repositories:` explicit
+
+The `tap-token` step pins `repositories: homebrew-tools`. Leave it pinned: if
+that input is omitted, the minted token is scoped to *every* repo the App is
+installed on. Identical today, but it silently widens the moment the App is
+installed somewhere else.

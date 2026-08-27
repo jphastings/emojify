@@ -78,9 +78,10 @@ checksum:
 #
 # Auth: HOMEBREW_TAP_TOKEN is minted at release time from a GitHub App
 # (short-lived, scoped to the tap repo) rather than a long-lived PAT — see
-# docs/homebrew-tap-setup.md. Until that App is installed, the workflow
-# passes an empty token and skip_upload below turns this into a no-op, so
-# tagging a release still succeeds; the cask simply isn't pushed.
+# docs/homebrew-tap-setup.md. The skip_upload guard below is kept even now
+# the App exists, so that a local `--snapshot` build (and CI's snapshot job,
+# neither of which has the token) still generates the cask for inspection
+# without attempting to push it.
 homebrew_casks:
   - name: emojify
     repository:
@@ -111,10 +112,7 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emojify"]
           end
     caveats: |
-      This build uses the pure-Go embedding model: small, dependency-free,
-      and noticeably less sharp on subtle phrasing than the ONNX model.
-
-      For the full-quality model, run the container instead:
+      For the larger embedding model, and to run this as a server:
         docker run -p 8080:8080 ghcr.io/jphastings/emojify
 
 changelog:
