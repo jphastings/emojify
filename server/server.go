@@ -36,6 +36,9 @@ func New(matcher *emojify.Matcher) http.Handler {
 func newWithLimits(matcher *emojify.Matcher, cfg limitConfig) http.Handler {
 	h := &handler{matcher: matcher}
 	mux := http.NewServeMux()
+	// "/{$}" matches the root path *exactly*; a bare "GET /" would instead
+	// act as a catch-all and serve this page for every unmatched path.
+	mux.HandleFunc("GET /{$}", h.handleIndex)
 	mux.HandleFunc("GET /xrpc/me.byjp.emojify.suggestEmojis", h.handleSuggest)
 	mux.HandleFunc("GET /healthz", h.handleHealthz)
 	mux.HandleFunc("GET /xrpc/_health", h.handleXRPCHealth)

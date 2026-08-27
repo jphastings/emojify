@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -159,5 +160,61 @@ func TestLexiconRoute(t *testing.T) {
 	}
 	if ct := resp.Header.Get("Content-Type"); ct != "application/json; charset=utf-8" {
 		t.Errorf("content-type = %q, want application/json; charset=utf-8", ct)
+	}
+}
+
+func TestIndexRoute(t *testing.T) {
+	handler := New(newTestMatcher(t))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "text/html; charset=utf-8" {
+		t.Errorf("content-type = %q, want text/html; charset=utf-8", ct)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if !bytes.Contains(body, []byte("Emojify")) {
+		t.Error("index page body does not mention Emojify")
+	}
+	// The page must not *load* anything from a third party: it ships inside a
+	// self-hostable binary (see server/static.go), so a webfont or CDN script
+	// would phone out from someone's private box just to render a page.
+	// Ordinary hyperlinks (the GitHub footer link) and the SVG XML namespace
+	// in the favicon are not fetches, so they are deliberately not matched.
+	for _, fetch := range []string{
+		"fonts.googleapis.com",
+		"fonts.gstatic.com",
+		"<script src=",
+		"@import",
+		`rel="stylesheet"`,
+	} {
+		if bytes.Contains(body, []byte(fetch)) {
+			t.Errorf("index page loads external resource (%q); it must stay self-contained", fetch)
+		}
+	}
+}
+
+// TestIndexRouteDoesNotSwallowUnknownPaths guards the "/{$}" pattern: a bare
+// "GET /" would make the landing page a catch-all, masking 404s for typo'd
+// API paths.
+func TestIndexRouteDoesNotSwallowUnknownPaths(t *testing.T) {
+	handler := New(newTestMatcher(t))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/not-a-real-path")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("status = %d for unknown path, want 404", resp.StatusCode)
 	}
 }

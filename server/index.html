@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emojify — the right emoji for a bit of text</title>
+<meta name="description" content="Pick the most relevant emoji for a small length of text. Self-hostable, with a CLI and an XRPC endpoint.">
+<!-- Inline data-URI favicon: the page is served by the same tiny binary as the
+     API, and a /favicon.ico round-trip would spend one of the caller's
+     per-IP rate-limit tokens just to draw a tab icon. -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🙂</text></svg>">
+<style>
+  :root {
+    --bg: #fff8f0;
+    --bg-warm: #ffefe2;
+    --ink: #3a2a22;
+    --ink-soft: #7a6558;
+    --accent: #ff6b4a;
+    --accent-press: #e5502f;
+    --accent-ink: #fff8f0;
+    --card: #fffdfb;
+    --edge: #f2e2d4;
+    --code-bg: #fdf3e9;
+    --shadow: 20 12 8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #241c18;
+      --bg-warm: #2b211b;
+      --ink: #f7ece3;
+      --ink-soft: #b7a294;
+      --accent: #ff8367;
+      --accent-press: #ff9c85;
+      --accent-ink: #2a1a14;
+      --card: #2e241e;
+      --edge: #43332b;
+      --code-bg: #1d1714;
+      --shadow: 0 0 0;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    /* ui-rounded gives SF Rounded on Apple platforms — soft and toy-like
+       without shipping a webfont. Everything else falls back gracefully. */
+    font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN",
+                 Quicksand, Varela Round, system-ui, sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(60rem 40rem at 78% -10%, var(--bg-warm), transparent 70%);
+    color: var(--ink);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: clamp(2.5rem, 9vw, 5.5rem) clamp(1.25rem, 5vw, 2rem) 4rem;
+  }
+
+  h1 {
+    font-size: clamp(2.6rem, 9vw, 3.8rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin: 0;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  /* The logo emoji doubles as the result display: asking for a suggestion
+     re-marks the page with its own answer. */
+  .mark {
+    font-size: 0.95em;
+    line-height: 1;
+    background: none;
+    border: 0;
+    padding: 0.1em 0.15em;
+    border-radius: 0.3em;
+    cursor: pointer;
+    transition: background 0.18s;
+  }
+  .mark:hover { background: var(--bg-warm); }
+  .mark:focus-visible { outline: 3px solid var(--accent); outline-offset: 0; }
+  .mark.pop { animation: pop 0.42s cubic-bezier(.22,1,.36,1); }
+  .mark.thinking { opacity: 0.35; }
+
+  .tagline {
+    margin: 0.75rem 0 0;
+    font-size: clamp(1.05rem, 3vw, 1.2rem);
+    color: var(--ink-soft);
+    max-width: 34ch;
+  }
+
+  /* ---- the toy ---- */
+
+  form {
+    display: flex;
+    gap: 0.6rem;
+    margin: clamp(2rem, 6vw, 2.75rem) 0 0;
+  }
+
+  input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    font: inherit;
+    font-size: 1.05rem;
+    color: var(--ink);
+    background: var(--card);
+    border: 2px solid var(--edge);
+    border-radius: 999px;
+    padding: 0.85rem 1.25rem;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  input[type="text"]::placeholder { color: var(--ink-soft); opacity: 0.75; }
+  input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+
+  button {
+    font: inherit;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border: none;
+    border-radius: 999px;
+    padding: 0.85rem 1.6rem;
+    cursor: pointer;
+    transition: transform 0.12s cubic-bezier(.22,1,.36,1), background 0.18s;
+  }
+  button:hover { background: var(--accent-press); }
+  button:active { transform: translateY(2px) scale(0.97); }
+  button:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+  }
+  button[disabled] { opacity: 0.55; cursor: default; transform: none; }
+
+  /* ---- result ---- */
+
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.55) rotate(-8deg); }
+    to   { opacity: 1; transform: scale(1) rotate(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mark.pop { animation: none; }
+    button, input, .mark { transition: none; }
+  }
+
+  /* Errors and copy confirmation live here so they never displace the
+     layout — the slot is always present, just usually empty. */
+  .status {
+    min-height: 1.4rem;
+    margin-top: 0.7rem;
+    font-size: 0.92rem;
+    color: var(--ink-soft);
+  }
+
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem;
+    margin-top: 0.7rem;
+  }
+  .examples .try {
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+    margin-right: 0.1rem;
+  }
+  .examples button {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1.5px solid var(--edge);
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.3rem 0.85rem;
+  }
+  .examples button:hover {
+    background: var(--card);
+    color: var(--ink);
+    border-color: var(--accent);
+  }
+
+  /* ---- docs ---- */
+
+  .docs {
+    margin-top: clamp(2.25rem, 6vw, 3.25rem);
+    display: grid;
+    gap: 1.75rem;
+  }
+
+  h2 {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--ink-soft);
+    margin: 0 0 0.55rem;
+    font-weight: 700;
+  }
+
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    border: 1.5px solid var(--edge);
+    border-radius: 0.9rem;
+    padding: 0.9rem 1.1rem;
+    overflow-x: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--ink);
+  }
+  pre .prompt, pre .verb { color: var(--ink-soft); user-select: none; }
+
+  .aside {
+    margin: 0.5rem 0 0;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+  }
+
+  footer {
+    margin-top: 3rem;
+    font-size: 0.88rem;
+    color: var(--ink-soft);
+  }
+  a { color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
+
+  .sr {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>
+    Emojify
+    <button type="button" class="mark" id="mark"
+            aria-live="polite" title="Your result lands here">🤩</button>
+  </h1>
+  <p class="tagline">Pick the most relevant emoji for a small length of text.</p>
+
+  <form id="f" autocomplete="off">
+    <label class="sr" for="t">Text to emojify</label>
+    <input id="t" type="text" name="text" maxlength="300"
+           placeholder="quiet morning, strong coffee" required>
+    <button type="submit" id="go">Go</button>
+  </form>
+
+  <div class="examples" id="ex">
+    <span class="try">or try</span>
+    <button type="button">I am freezing cold</button>
+    <button type="button">let’s get pizza</button>
+    <button type="button">we won the game</button>
+  </div>
+
+  <p class="status" id="status"></p>
+
+  <div class="docs">
+    <section>
+      <h2>Run your own</h2>
+<pre><span class="prompt">$</span> docker run -p 8080:8080 ghcr.io/jphastings/emojify</pre>
+    </section>
+
+    <section>
+      <h2>Install locally</h2>
+<pre><span class="prompt">$</span> go install github.com/jphastings/emojify/cmd/emojify@latest
+<span class="prompt">$</span> echo "happy birthday!" | emojify
+🥳</pre>
+      <p class="aside">Installs the pure-Go model — small and dependency-free.
+      Docker and the box above use the larger one, which is sharper on subtler phrasing.</p>
+    </section>
+
+    <section>
+      <h2>XRPC endpoint</h2>
+<pre><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmojis?text=Awesome&amp;limit=1</pre>
+    </section>
+  </div>
+
+  <footer>
+    <a href="https://github.com/jphastings/emojify">Source on GitHub</a> · MIT
+  </footer>
+</main>
+
+<script>
+(function () {
+  var form = document.getElementById("f");
+  var input = document.getElementById("t");
+  var mark = document.getElementById("mark");
+  var status = document.getElementById("status");
+  var go = document.getElementById("go");
+  var icon = document.querySelector('link[rel="icon"]');
+  var busy = false;
+  var current = mark.textContent;
+
+  function say(msg) {
+    status.textContent = msg || "";
+  }
+
+  function setFavicon(emoji) {
+    icon.href =
+      "data:image/svg+xml," +
+      encodeURIComponent(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>" +
+        "<text y='.9em' font-size='90'>" + emoji + "</text></svg>"
+      );
+  }
+
+  function show(emoji, name) {
+    current = emoji;
+    mark.textContent = emoji;
+    mark.title = name + " — click to copy";
+    mark.setAttribute("aria-label", name + ". Click to copy.");
+    setFavicon(emoji);
+    // Restart the animation: without forcing a reflow, re-adding the class
+    // in the same frame is a no-op and the second result wouldn't animate.
+    mark.classList.remove("pop");
+    void mark.offsetWidth;
+    mark.classList.add("pop");
+  }
+
+  mark.addEventListener("click", function () {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(current).then(function () {
+      say("Copied " + current);
+      setTimeout(function () {
+        if (status.textContent.indexOf("Copied") === 0) say("");
+      }, 1400);
+    });
+  });
+
+  async function run(text) {
+    if (busy || !text.trim()) return;
+    busy = true;
+    go.disabled = true;
+    mark.classList.add("thinking");
+    say("");
+    try {
+      var res = await fetch(
+        "/xrpc/me.byjp.emojify.suggestEmojis?limit=1&text=" + encodeURIComponent(text)
+      );
+      var body = await res.json().catch(function () { return {}; });
+      if (res.ok && body.suggestions && body.suggestions.length) {
+        show(body.suggestions[0].emoji, body.suggestions[0].name);
+      } else if (res.status === 429) {
+        say("Whoa, steady on — try again in a second.");
+      } else if (body.error === "TextTooLong") {
+        say("That’s a bit long — keep it under 300 characters.");
+      } else if (body.error === "NoMatch") {
+        say("Nothing matched that one.");
+      } else {
+        say("Something went wrong. Try again?");
+      }
+    } catch (e) {
+      say("Couldn’t reach the server.");
+    }
+    mark.classList.remove("thinking");
+    busy = false;
+    go.disabled = false;
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    run(input.value);
+  });
+
+  document.getElementById("ex").addEventListener("click", function (e) {
+    if (e.target.tagName !== "BUTTON") return;
+    input.value = e.target.textContent;
+    run(input.value);
+  });
+})();
+</script>
+</body>
+</html>
