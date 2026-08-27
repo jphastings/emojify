@@ -66,6 +66,53 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+# Publishes a Homebrew cask to github.com/jphastings/homebrew-tools, so
+# `brew install jphastings/tools/emojify` works.
+#
+# A cask, not a formula: goreleaser's `brews:` (formula) block is deprecated
+# and now fails `goreleaser check` outright — `homebrew_casks` is its
+# replacement. The generated cask does carry on_linux URLs, but cask support
+# on Homebrew-for-Linux is patchy, so macOS is the path this is actually
+# expected to serve; Linux users have `go install`, the release archives, and
+# the container image.
+#
+# Auth: HOMEBREW_TAP_TOKEN is minted at release time from a GitHub App
+# (short-lived, scoped to the tap repo) rather than a long-lived PAT — see
+# docs/homebrew-tap-setup.md. Until that App is installed, the workflow
+# passes an empty token and skip_upload below turns this into a no-op, so
+# tagging a release still succeeds; the cask simply isn't pushed.
+homebrew_casks:
+  - name: emojify
+    repository:
+      owner: jphastings
+      name: homebrew-tools
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    skip_upload: '{{ if .Env.HOMEBREW_TAP_TOKEN }}false{{ else }}true{{ end }}'
+    directory: Casks
+    binaries:
+      - emojify
+    description: Pick the most relevant emoji for a small length of text
+    homepage: https://github.com/jphastings/emojify
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    # These archives are neither signed nor notarized, so Gatekeeper would
+    # otherwise quarantine the binary and macOS would refuse to run it.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"], print_stderr: false).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emojify"]
+          end
+    caveats: |
+      This build uses the pure-Go embedding model: small, dependency-free,
+      and noticeably less sharp on subtle phrasing than the ONNX model.
+
+      For the full-quality model, run the container instead:
+        docker run -p 8080:8080 ghcr.io/jphastings/emojify
+
 changelog:
   sort: asc
   filters:

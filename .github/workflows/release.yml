@@ -22,6 +22,21 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # Mints a short-lived, tap-scoped token from a GitHub App so the cask
+      # push doesn't need a long-lived PAT. Until that App is created and
+      # installed (see docs/homebrew-tap-setup.md) these secrets are unset:
+      # this step is skipped, HOMEBREW_TAP_TOKEN below stays empty, and
+      # .goreleaser.yaml's skip_upload turns the cask into a no-op rather
+      # than failing the release.
+      - id: tap-token
+        if: vars.HOMEBREW_TAP_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HOMEBREW_TAP_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_TAP_APP_PRIVATE_KEY }}
+          owner: jphastings
+          repositories: homebrew-tools
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -29,6 +44,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Always defined (possibly empty) so goreleaser's `{{ .Env.… }}`
+          # lookup resolves either way.
+          HOMEBREW_TAP_TOKEN: ${{ steps.tap-token.outputs.token }}
 
   # Builds the onnx (production) container image per-architecture on native
   # runners rather than via QEMU emulation on one runner: cross-building this

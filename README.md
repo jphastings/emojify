@@ -16,6 +16,20 @@ native dependency, the only option on an ARMv6 original Pi Zero):
 
     CGO_ENABLED=0 go build ./cmd/emojify
 
+## Install
+
+    go install github.com/jphastings/emojify/cmd/emojify@latest
+
+This gives the pure-Go embedder — small and dependency-free, but less sharp on
+subtle phrasing than the ONNX model. For that, run the container (see Docker
+below) or build with `-tags onnx`.
+
+A Homebrew cask (`brew install jphastings/tools/emojify`) is configured but
+**not live yet** — it starts publishing on the first release after the tap's
+GitHub App is set up. See
+[docs/homebrew-tap-setup.md](docs/homebrew-tap-setup.md) for the remaining
+manual steps.
+
 ## Run
 
     echo "what a beautiful day" | ./emojify
