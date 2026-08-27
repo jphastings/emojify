@@ -14,7 +14,7 @@ Default build (ONNX Runtime, cgo, needs `libonnxruntime` installed — e.g.
 Static, cgo-free build (pure-Go GloVe-averaging embedder — lower quality, no
 native dependency, the only option on an ARMv6 original Pi Zero):
 
-    CGO_ENABLED=0 go build -tags '!onnx' ./cmd/emojify
+    CGO_ENABLED=0 go build ./cmd/emojify
 
 ## Run
 
@@ -48,7 +48,7 @@ For boards where installing ONNX Runtime isn't worth it, cross-compile the
 static build instead — this produces a single file with no runtime
 dependency at all:
 
-    GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -tags '!onnx' -o emojify-arm ./cmd/emojify
+    GOOS=linux GOARCH=arm CGO_ENABLED=0 go build -o emojify-arm ./cmd/emojify
 
 ## Benchmarking on real target hardware
 
