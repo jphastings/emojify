@@ -96,3 +96,7 @@ run the same command there:
 The endpoint is open/anonymous by design (no auth) but rate-limited per-IP
 and bounded in concurrency — see `server/limits.go`. Requests are logged by
 result and latency only; input text is never logged.
+
+## License
+
+[MIT](LICENSE)
