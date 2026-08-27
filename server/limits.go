@@ -33,10 +33,16 @@ func withRateLimit(cfg limitConfig, next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := clientIP(r)
-		limiter, ok := buckets.Get(ip)
-		if !ok {
-			limiter = rate.NewLimiter(rate.Limit(cfg.requestsPerSecond), cfg.burst)
-			buckets.Add(ip, limiter)
+		// PeekOrAdd is a single locked get-or-insert: Get-then-Add here would
+		// let concurrent requests for a brand-new IP each construct and use
+		// their own private limiter before any Add() lands, defeating the
+		// burst limit during exactly the concurrent-burst pattern it exists
+		// to stop.
+		newLimiter := rate.NewLimiter(rate.Limit(cfg.requestsPerSecond), cfg.burst)
+		existing, found, _ := buckets.PeekOrAdd(ip, newLimiter)
+		limiter := newLimiter
+		if found {
+			limiter = existing
 		}
 		if !limiter.Allow() {
 			writeXRPCError(w, http.StatusTooManyRequests, "RateLimitExceeded", "too many requests, slow down")
