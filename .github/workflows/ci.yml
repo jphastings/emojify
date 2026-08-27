@@ -60,6 +60,11 @@ jobs:
             -o /tmp/ort.tgz
           sudo tar -xzf /tmp/ort.tgz -C /usr/local --strip-components=1
           sudo ldconfig
+          # embedder_onnx.go's default Linux lookup path is /usr/lib (the
+          # distro-packaged location) via an absolute dlopen(), which
+          # ldconfig's search path doesn't help with — same mismatch the
+          # Dockerfile already works around with this exact env var.
+          echo "EMOJIFY_ORT_LIBRARY_PATH=/usr/local/lib/libonnxruntime.so" >> "$GITHUB_ENV"
 
       - name: Fetch the ONNX model + vocab
         run: ./scripts/fetch-onnx-model.sh
