@@ -88,11 +88,17 @@ homebrew_casks:
       owner: jphastings
       name: homebrew-tools
       branch: main
-      # `index .Env "…"` rather than `.Env.…`: the latter is a hard error
-      # when the variable is absent entirely (rather than set-but-empty),
-      # which is the normal case for a local `--snapshot` build and for CI's
-      # snapshot job. `index` yields "" instead, so the skip below engages.
-      token: '{{ index .Env "HOMEBREW_TAP_TOKEN" }}'
+      # This field is special-cased by goreleaser: it validates the literal
+      # string and accepts *only* `{{ .Env.VAR_NAME }}` — `index .Env "..."`
+      # is rejected with "expected {{ .Env.VAR_NAME }} only". It's resolved
+      # lazily, at publish time, so the absent-variable case is handled by
+      # skip_upload below rather than here.
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    # `index .Env "…"` rather than `.Env.…`: the latter is a hard error when
+    # the variable is absent entirely (rather than set-but-empty), which is
+    # the normal case for a local `--snapshot` build and CI's snapshot job.
+    # `index` yields "" instead, so this skips cleanly. Unlike `token` above,
+    # this field takes ordinary template syntax.
     skip_upload: '{{ if index .Env "HOMEBREW_TAP_TOKEN" }}false{{ else }}true{{ end }}'
     directory: Casks
     binaries:
