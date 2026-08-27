@@ -20,8 +20,6 @@ var staticVecsData []byte
 //go:embed data/index_static.bin
 var defaultIndexData []byte
 
-const staticDims = 50
-
 // DefaultIndexPath is the `index build` output path this build tag actually
 // embeds (see defaultIndexData above); mirrors embedder_onnx.go's constant of
 // the same name so cmd/emojify compiles unchanged under either tag.
