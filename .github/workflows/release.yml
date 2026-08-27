@@ -12,7 +12,13 @@ permissions:
 jobs:
   goreleaser:
     name: Build & publish binaries (GitHub Release)
-    runs-on: ubuntu-latest
+    # macOS, not ubuntu: this job now also builds the darwin `-tags onnx`
+    # binaries (see .goreleaser.yaml), which are cgo and need a real
+    # toolchain for the target OS — cgo darwin builds can't be produced on
+    # Linux. The CGO_ENABLED=0 linux/windows/arm builds cross-compile from
+    # macOS just fine, so the whole goreleaser run stays on one runner
+    # rather than being split. Don't move this back to ubuntu-latest.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:

@@ -111,7 +111,14 @@ func TestSuggestEmojiInternalError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadIndex: %v", err)
 	}
-	m, err := emojify.New(emojify.WithEmbedder(erroringEmbedder{dims: idx.Dims}))
+	// WithIndex pins the index explicitly: erroringEmbedder lives outside
+	// package emojify, so it can never implement the unexported indexProvider
+	// interface New() uses to pick a matching default index, and would
+	// otherwise always be paired with the static one regardless of idx.Dims.
+	m, err := emojify.New(
+		emojify.WithEmbedder(erroringEmbedder{dims: idx.Dims}),
+		emojify.WithIndex(bytes.NewReader(emojify.DefaultIndexBytes())),
+	)
 	if err != nil {
 		t.Fatalf("emojify.New: %v", err)
 	}

@@ -68,11 +68,13 @@ func New(opts ...Option) (*Matcher, error) {
 	}
 
 	if cfg.embedder == nil {
-		// The onnx build's NewDefaultEmbedder resolves its own model path
-		// (explicit arg -> EMOJIFY_MODEL_PATH -> DefaultModelPath, see Task
-		// 9); New() has no dedicated model-path Option, matching the spec's
-		// §3 Option list exactly — a caller needing a custom path builds its
-		// own Embedder via NewDefaultEmbedder(path) and passes WithEmbedder.
+		// NewDefaultEmbedder picks ONNX vs. static at runtime (env var
+		// EMOJIFY_EMBEDDER, or auto-detecting ONNX Runtime); its onnx path
+		// resolves its own model path (explicit arg -> EMOJIFY_MODEL_PATH ->
+		// DefaultModelPath -> embedded model). New() has no dedicated
+		// model-path Option, matching the spec's §3 Option list exactly — a
+		// caller needing a custom path builds its own Embedder via
+		// NewDefaultEmbedder(path) and passes WithEmbedder.
 		emb, err := NewDefaultEmbedder("")
 		if err != nil {
 			return nil, fmt.Errorf("emojify: default embedder: %w", err)
@@ -80,7 +82,13 @@ func New(opts ...Option) (*Matcher, error) {
 		cfg.embedder = emb
 	}
 	if cfg.index == nil {
-		idx, err := ReadIndex(bytes.NewReader(defaultIndexData))
+		// The index must match whichever embedder was actually chosen above,
+		// not just whichever build tag compiled it in — see indexProvider.
+		indexData := staticIndexData
+		if ip, ok := cfg.embedder.(indexProvider); ok {
+			indexData = ip.defaultIndex()
+		}
+		idx, err := ReadIndex(bytes.NewReader(indexData))
 		if err != nil {
 			return nil, fmt.Errorf("emojify: default index: %w", err)
 		}
@@ -94,7 +102,14 @@ func New(opts ...Option) (*Matcher, error) {
 	return &Matcher{embedder: cfg.embedder, index: cfg.index, minScore: cfg.minScore, maxRunes: cfg.maxRunes}, nil
 }
 
-// DefaultIndexBytes returns the raw bytes of this build's embedded default
-// index (data/index.bin or data/index_static.bin depending on build tag).
-// Exposed for `emojify index inspect`; not part of the Suggest/New surface.
-func DefaultIndexBytes() []byte { return defaultIndexData }
+// DefaultIndexBytes returns the raw bytes of the index matching what
+// NewDefaultEmbedder would actually pick at runtime: the onnx index
+// (data/index.bin) when ONNX Runtime is loadable, data/index_static.bin
+// otherwise. Exposed for `emojify index inspect`; not part of the
+// Suggest/New surface.
+func DefaultIndexBytes() []byte {
+	if ortAvailable() {
+		return preferredIndexData()
+	}
+	return staticIndexData
+}

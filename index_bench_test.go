@@ -15,7 +15,7 @@ import (
 func BenchmarkReadIndex(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := ReadIndex(bytes.NewReader(defaultIndexData)); err != nil {
+		if _, err := ReadIndex(bytes.NewReader(DefaultIndexBytes())); err != nil {
 			b.Fatalf("ReadIndex: %v", err)
 		}
 	}

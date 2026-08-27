@@ -303,7 +303,8 @@
 
     <section>
       <h2>Install locally</h2>
-<pre><code><span class="prompt">$</span> brew install jphastings/tools/emojify</code><code><span class="prompt">$</span> echo "happy birthday!" | emojify --limit 1</code><code>🥳</code></pre>
+<pre><code><span class="prompt">$</span> brew install jphastings/tools/emojify onnxruntime</code><code><span class="prompt">$</span> echo "happy birthday!" | emojify --limit 1</code><code>🎂</code></pre>
+      <p class="aside"><code class="inline">onnxruntime</code> is optional, but it&rsquo;s the model behind the demo above. Without it emojify falls back to a smaller built-in one.</p>
       <p class="aside">Not on Homebrew? <code class="inline">go install github.com/jphastings/emojify/cmd/emojify@latest</code></p>
     </section>
 

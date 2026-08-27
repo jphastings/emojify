@@ -78,6 +78,8 @@ func TestGoldenTable(t *testing.T) {
 		}
 	}
 
+	checkGoldenPreconditions(t)
+
 	rate := float64(passed) / float64(asserted)
 	t.Logf("golden pass rate: %d/%d = %.0f%%", passed, asserted, rate*100)
 	if rate < wantPassRate {

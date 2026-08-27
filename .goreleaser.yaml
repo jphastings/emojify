@@ -5,16 +5,34 @@ project_name: emojify
 before:
   hooks:
     - go mod tidy
+    - ./scripts/fetch-onnx-model.sh
 
 builds:
-  # The onnx (production, high-quality) embedder needs cgo + a real
-  # libonnxruntime for the target platform, which goreleaser can't
-  # reasonably cross-compile for every OS/arch here — that build only
-  # ships as the ghcr.io container image (built from the Dockerfile in
-  # .github/workflows/release.yml, alongside this release, not by
-  # goreleaser). These builds are the CGO_ENABLED=0 static fallback
-  # embedder (see README's "Build" section) — a genuinely standalone
-  # single-file binary, including for the Pi Zero's ARMv6.
+  # Two families of build here:
+  #
+  #   - `emojify` / `emojify-arm`: the CGO_ENABLED=0 static pure-Go embedder
+  #     (see README's "Build" section) — a genuinely standalone single-file
+  #     binary, including for the Pi Zero's ARMv6. Covers linux, windows,
+  #     and linux/arm.
+  #
+  #   - `emojify-onnx-arm64` / `emojify-onnx-amd64`: darwin binaries built
+  #     with `-tags onnx`, CGO_ENABLED=1. The onnx build tag is additive —
+  #     these binaries embed the same pure-Go embedder as a fallback, and
+  #     pick the real ONNX embedder at runtime if libonnxruntime can be
+  #     dlopen'd (i.e. once the user runs `brew install onnxruntime`), so
+  #     macOS users get the production-quality embedder with no rebuild.
+  #
+  # goreleaser can't reasonably cross-compile cgo for every OS/arch, which is
+  # why only darwin gets an onnx-tagged build here, and why it's two build
+  # ids with a static per-arch `CC` rather than one templated build: arm64
+  # and amd64 need different `clang -arch` flags, and two static build ids
+  # are simpler and certain to work than templating CC. The CGO_ENABLED=0
+  # builds below stay static, and only cover linux/windows/arm.
+  #
+  # The onnx-tagged container image (ghcr.io/jphastings/emojify) is still
+  # built separately, from the Dockerfile, by release.yml rather than
+  # goreleaser — it remains the option for non-macOS users who want the
+  # production embedder without installing onnxruntime themselves.
   - id: emojify
     main: ./cmd/emojify
     binary: emojify
@@ -22,7 +40,6 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - amd64
@@ -48,11 +65,61 @@ builds:
     ldflags:
       - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
 
+  - id: emojify-onnx-arm64
+    main: ./cmd/emojify
+    binary: emojify
+    env:
+      - CGO_ENABLED=1
+      - CC=clang -arch arm64
+      # Without these, a cgo build stamps the *builder's* SDK as its minimum
+      # macOS (LC_BUILD_VERSION minos) and the binary refuses to launch on
+      # anything older. 12.0 is what Go's own CGO_ENABLED=0 darwin builds
+      # target, so this keeps the cask's OS reach identical to the static
+      # builds' rather than pinned to whatever runner image built it.
+      - MACOSX_DEPLOYMENT_TARGET=12.0
+      - CGO_CFLAGS=-mmacosx-version-min=12.0
+      - CGO_LDFLAGS=-mmacosx-version-min=12.0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    flags:
+      - -tags
+      - onnx
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+
+  - id: emojify-onnx-amd64
+    main: ./cmd/emojify
+    binary: emojify
+    env:
+      - CGO_ENABLED=1
+      - CC=clang -arch x86_64
+      # Without these, a cgo build stamps the *builder's* SDK as its minimum
+      # macOS (LC_BUILD_VERSION minos) and the binary refuses to launch on
+      # anything older. 12.0 is what Go's own CGO_ENABLED=0 darwin builds
+      # target, so this keeps the cask's OS reach identical to the static
+      # builds' rather than pinned to whatever runner image built it.
+      - MACOSX_DEPLOYMENT_TARGET=12.0
+      - CGO_CFLAGS=-mmacosx-version-min=12.0
+      - CGO_LDFLAGS=-mmacosx-version-min=12.0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    flags:
+      - -tags
+      - onnx
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+
 archives:
   - id: emojify-archive
     ids:
       - emojify
       - emojify-arm
+      - emojify-onnx-arm64
+      - emojify-onnx-amd64
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -76,6 +143,12 @@ checksum:
 # expected to serve; Linux users have `go install`, the release archives, and
 # the container image.
 #
+# The cask ships the onnx-tagged darwin binaries (emojify-onnx-arm64 /
+# emojify-onnx-amd64, see builds: above) — not the pure-Go static ones — so
+# that `brew install onnxruntime` is all a user needs to unlock the
+# production embedder, with no dependency on onnxruntime baked into the
+# cask itself.
+#
 # Auth: HOMEBREW_TAP_TOKEN is minted at release time from a GitHub App
 # (short-lived, scoped to the tap repo) rather than a long-lived PAT — see
 # docs/homebrew-tap-setup.md. The skip_upload guard below is kept even now
@@ -84,6 +157,8 @@ checksum:
 # without attempting to push it.
 homebrew_casks:
   - name: emojify
+    ids:
+      - emojify-archive
     repository:
       owner: jphastings
       name: homebrew-tools
@@ -118,8 +193,9 @@ homebrew_casks:
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emojify"]
           end
     caveats: |
-      For the larger embedding model, and to run this as a server:
-        docker run -p 8080:8080 ghcr.io/jphastings/emojify
+      Uses a small built-in embedding model by default. `brew install onnxruntime`
+      unlocks substantially better matches automatically — no further setup needed.
+      To run this as a server instead: docker run -p 8080:8080 ghcr.io/jphastings/emojify
 
 changelog:
   sort: asc
@@ -135,9 +211,14 @@ release:
 
 
     A multi-arch `onnx`-tagged container image (the production, high-quality
-    embedder) is published alongside this release to
+    embedder, bundling onnxruntime) is published alongside this release to
     `ghcr.io/jphastings/emojify:{{ .Tag }}` (and `:latest`). See the
     [README](https://github.com/jphastings/emojify#docker) for run
-    instructions. The binaries in this release use the pure-Go static
-    fallback embedder instead — see the README for what that trade-off
-    means.
+    instructions.
+
+
+    macOS binaries in this release are built with the same onnx-tagged
+    embedder and use libonnxruntime automatically if it's installed
+    (`brew install onnxruntime`), otherwise falling back to the pure-Go
+    static embedder. Linux and Windows binaries are pure-Go static builds
+    only — see the README for what that trade-off means.

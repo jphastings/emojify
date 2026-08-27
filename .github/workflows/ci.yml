@@ -75,7 +75,11 @@ jobs:
 
   goreleaser-check:
     name: goreleaser snapshot build
-    runs-on: ubuntu-latest
+    # macOS, not ubuntu: this snapshot build exercises the same
+    # .goreleaser.yaml as the real release, which includes cgo darwin
+    # `-tags onnx` builds — cgo darwin builds can't be produced on Linux.
+    # See release.yml's goreleaser job for the same reasoning.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:

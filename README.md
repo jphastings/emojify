@@ -5,25 +5,42 @@ meaning, via nearest-neighbour search over sentence embeddings.
 
 ## Build
 
-Default build (ONNX Runtime, cgo, needs `libonnxruntime` installed — e.g.
-`brew install onnxruntime` on macOS):
-
-    ./scripts/fetch-onnx-model.sh   # once, downloads data/model.onnx + data/vocab.txt
-    go build -tags onnx ./cmd/emojify
+The `onnx` build tag is **additive**, not exclusive. A bare `go build` gives
+you the pure-Go embedder only; `-tags onnx` gives you a binary containing
+*both*, which picks between them at runtime.
 
 Static, cgo-free build (pure-Go GloVe-averaging embedder — lower quality, no
 native dependency, the only option on an ARMv6 original Pi Zero):
 
     CGO_ENABLED=0 go build ./cmd/emojify
 
+Dual build (cgo; embeds the real model, so the fetch is required to *compile*):
+
+    ./scripts/fetch-onnx-model.sh   # once, downloads data/model.onnx + data/vocab.txt
+    go build -tags onnx ./cmd/emojify
+
+An `-tags onnx` binary uses the ONNX embedder when it can `dlopen`
+`libonnxruntime` (`brew install onnxruntime`, or see
+`EMOJIFY_ORT_LIBRARY_PATH`), and silently falls back to the pure-Go one when
+it can't. Force either with `EMOJIFY_EMBEDDER=onnx` (error if unavailable) or
+`EMOJIFY_EMBEDDER=static`.
+
+The model and vocab are embedded in the binary, so no `data/` directory needs
+deploying alongside it. An on-disk `data/model.onnx`, or `EMOJIFY_MODEL_PATH`,
+still takes precedence when present — handy for swapping models in
+development.
+
 ## Install
 
-    brew install jphastings/tools/emojify                      # macOS
+    brew install jphastings/tools/emojify onnxruntime           # macOS
     go install github.com/jphastings/emojify/cmd/emojify@latest
 
-Both ship the pure-Go embedder: small, dependency-free, and less sharp on
-subtle phrasing than the ONNX model. For that one, run the container (see
-Docker below) or build with `-tags onnx`.
+The cask ships the dual macOS binary, so `onnxruntime` is optional: install it
+(now or later) and emojify upgrades itself to the production embedder with no
+rebuild. Without it — and for `go install`, which is pure-Go only — you get
+the small dependency-free embedder, which is noticeably less sharp on subtle
+phrasing. Linux and Windows release binaries are pure-Go only; for the
+production embedder there, run the container (see Docker below).
 
 The cask is published to [jphastings/homebrew-tools](https://github.com/jphastings/homebrew-tools)
 on each release — see [docs/homebrew-tap-setup.md](docs/homebrew-tap-setup.md)
@@ -65,9 +82,11 @@ minimum for the container, 512MB for headroom.
 
 Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers `.github/workflows/release.yml`:
 [goreleaser](https://goreleaser.com) cross-compiles the static (`!onnx`)
-binary for linux/darwin/windows × amd64/arm64, plus linux/arm (`GOARM` 6 and
-7, for the Pi Zero family), and publishes them as a GitHub Release with a
-changelog and checksums. Separately, the `onnx` (production) image is built
+binary for linux/windows × amd64/arm64, plus linux/arm (`GOARM` 6 and 7, for
+the Pi Zero family), builds the dual `-tags onnx` binary for darwin ×
+amd64/arm64, and publishes them all as a GitHub Release with a changelog and
+checksums. The release job runs on macOS because those darwin builds need
+cgo, which can't be cross-compiled from Linux. Separately, the `onnx` (production) image is built
 natively per architecture (no QEMU — see the workflow's comments for why)
 and published to `ghcr.io/jphastings/emojify` tagged with the version,
 the `major.minor`, and `latest`.

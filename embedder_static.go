@@ -1,6 +1,4 @@
 // embedder_static.go
-//go:build !onnx
-
 package emojify
 
 import (
@@ -18,12 +16,7 @@ import (
 var staticVecsData []byte
 
 //go:embed data/index_static.bin
-var defaultIndexData []byte
-
-// DefaultIndexPath is the `index build` output path this build tag actually
-// embeds (see defaultIndexData above); mirrors embedder_onnx.go's constant of
-// the same name so cmd/emojify compiles unchanged under either tag.
-const DefaultIndexPath = "data/index_static.bin"
+var staticIndexData []byte
 
 var wordPattern = regexp.MustCompile(`[a-z]+`)
 
@@ -33,9 +26,11 @@ type staticEmbedder struct {
 	dims     int
 }
 
-// NewDefaultEmbedder returns the compiled-in pure-Go embedder. modelPath is
-// accepted for interface parity with the onnx build and is ignored.
-func NewDefaultEmbedder(modelPath string) (Embedder, error) {
+// newDefaultStaticEmbedder returns the compiled-in pure-Go embedder. Always
+// available regardless of build tag — it's the fallback NewDefaultEmbedder
+// (embedder_select.go) reaches for when ONNX Runtime isn't loadable, and the
+// only embedder that exists at all in a bare `go build`.
+func newDefaultStaticEmbedder() (Embedder, error) {
 	return newStaticEmbedder(staticVecsData)
 }
 
@@ -48,6 +43,10 @@ func newStaticEmbedder(data []byte) (*staticEmbedder, error) {
 }
 
 func (e *staticEmbedder) Dims() int { return e.dims }
+
+// defaultIndex pairs this embedder with the index built for its own
+// (50-dim) vectors — see indexProvider in embedder.go.
+func (e *staticEmbedder) defaultIndex() []byte { return staticIndexData }
 
 func (e *staticEmbedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	out := make([][]float32, len(texts))

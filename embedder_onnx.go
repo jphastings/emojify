@@ -5,6 +5,7 @@ package emojify
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
@@ -19,15 +20,24 @@ import (
 )
 
 //go:embed data/index.bin
-var defaultIndexData []byte
+var onnxIndexData []byte
+
+// embeddedModel and embeddedVocab let an onnx-tagged binary run the real
+// model with no data/ directory on disk at all — see newONNXEmbedder's
+// resolution order. They make -tags onnx strictly additive to the static
+// build rather than requiring a companion data/ directory to be deployed
+// alongside it.
+//
+//go:embed data/model.onnx
+var embeddedModel []byte
+
+//go:embed data/vocab.txt
+var embeddedVocab []byte
 
 const (
 	onnxDims         = 384
 	onnxMaxTokens    = 256
 	DefaultModelPath = "data/model.onnx"
-	// DefaultIndexPath mirrors DefaultModelPath's pattern: the path `index
-	// build` writes to by default under this build tag.
-	DefaultIndexPath = "data/index.bin"
 )
 
 var (
@@ -42,6 +52,11 @@ func ensureORTInitialized() error {
 	})
 	return ortInitErr
 }
+
+// ortAvailable reports whether ONNX Runtime can actually be dlopen'd on this
+// machine — the runtime signal newONNXEmbedderOrErr and NewDefaultEmbedder
+// use to decide between the real model and the static fallback.
+func ortAvailable() bool { return ensureORTInitialized() == nil }
 
 func sharedLibraryPath() string {
 	if p := os.Getenv("EMOJIFY_ORT_LIBRARY_PATH"); p != "" {
@@ -67,26 +82,56 @@ type onnxEmbedder struct {
 	tokenizer *wordpiece.Tokenizer
 }
 
-// NewDefaultEmbedder loads the ONNX Runtime embedder. modelPath resolution
-// order: explicit argument -> EMOJIFY_MODEL_PATH env var -> DefaultModelPath.
-// vocab.txt is expected alongside the model file.
-func NewDefaultEmbedder(modelPath string) (Embedder, error) {
-	if modelPath == "" {
-		modelPath = os.Getenv("EMOJIFY_MODEL_PATH")
+// newONNXEmbedderOrErr is the onnx-tagged half of the shim
+// embedder_select.go calls without needing a build tag of its own; see
+// embedder_available_static.go for the !onnx half.
+func newONNXEmbedderOrErr(modelPath string) (Embedder, error) {
+	if !ortAvailable() {
+		return nil, fmt.Errorf("emojify: this binary supports ONNX Runtime but can't load it from %s — install onnxruntime (>= 1.29) or point EMOJIFY_ORT_LIBRARY_PATH at libonnxruntime: %w", sharedLibraryPath(), ensureORTInitialized())
 	}
-	if modelPath == "" {
-		modelPath = DefaultModelPath
-	}
-	vocabPath := filepath.Join(filepath.Dir(modelPath), "vocab.txt")
+	return newONNXEmbedder(modelPath)
+}
 
-	f, err := os.Open(vocabPath)
-	if err != nil {
-		return nil, fmt.Errorf("emojify: opening tokenizer vocab %s (expected alongside the model; run scripts/fetch-onnx-model.sh): %w", vocabPath, err)
+// newONNXEmbedder loads the ONNX Runtime embedder. Model/vocab resolution
+// order: explicit modelPath argument -> EMOJIFY_MODEL_PATH env var ->
+// DefaultModelPath if it exists on disk -> the model+vocab embedded in this
+// binary. The first three read vocab.txt alongside the model file on disk;
+// the embedded fallback needs no filesystem at all.
+func newONNXEmbedder(modelPath string) (Embedder, error) {
+	// Only the implicit default path (no explicit arg or env override) may
+	// fall back to the embedded model: an explicit path that doesn't exist
+	// should fail loudly, not silently substitute a different model.
+	explicit := modelPath != ""
+	if !explicit {
+		modelPath = os.Getenv("EMOJIFY_MODEL_PATH")
+		explicit = modelPath != ""
 	}
-	defer f.Close()
-	vocab, err := wordpiece.LoadVocab(bufio.NewReader(f))
-	if err != nil {
-		return nil, fmt.Errorf("emojify: parsing tokenizer vocab: %w", err)
+	useDisk := explicit
+	if !explicit {
+		modelPath = DefaultModelPath
+		if _, err := os.Stat(modelPath); err == nil {
+			useDisk = true
+		}
+	}
+
+	var vocab map[string]int64
+	if useDisk {
+		vocabPath := filepath.Join(filepath.Dir(modelPath), "vocab.txt")
+		f, err := os.Open(vocabPath)
+		if err != nil {
+			return nil, fmt.Errorf("emojify: opening tokenizer vocab %s (expected alongside the model; run scripts/fetch-onnx-model.sh): %w", vocabPath, err)
+		}
+		defer f.Close()
+		vocab, err = wordpiece.LoadVocab(bufio.NewReader(f))
+		if err != nil {
+			return nil, fmt.Errorf("emojify: parsing tokenizer vocab: %w", err)
+		}
+	} else {
+		var err error
+		vocab, err = wordpiece.LoadVocab(bufio.NewReader(bytes.NewReader(embeddedVocab)))
+		if err != nil {
+			return nil, fmt.Errorf("emojify: parsing embedded tokenizer vocab: %w", err)
+		}
 	}
 
 	if err := ensureORTInitialized(); err != nil {
@@ -110,15 +155,19 @@ func NewDefaultEmbedder(modelPath string) (Embedder, error) {
 		return nil, fmt.Errorf("emojify: allocating output tensor: %w", err)
 	}
 
-	session, err := ort.NewAdvancedSession(modelPath,
-		[]string{"input_ids", "attention_mask", "token_type_ids"},
-		[]string{"last_hidden_state"},
-		[]ort.Value{inputIDs, attnMask, typeIDs},
-		[]ort.Value{output},
-		nil,
-	)
+	inputNames := []string{"input_ids", "attention_mask", "token_type_ids"}
+	outputNames := []string{"last_hidden_state"}
+	inputs := []ort.Value{inputIDs, attnMask, typeIDs}
+	outputs := []ort.Value{output}
+
+	var session *ort.AdvancedSession
+	if useDisk {
+		session, err = ort.NewAdvancedSession(modelPath, inputNames, outputNames, inputs, outputs, nil)
+	} else {
+		session, err = ort.NewAdvancedSessionWithONNXData(embeddedModel, inputNames, outputNames, inputs, outputs, nil)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("emojify: loading ONNX model %s: %w", modelPath, err)
+		return nil, fmt.Errorf("emojify: loading ONNX model: %w", err)
 	}
 
 	return &onnxEmbedder{
@@ -132,6 +181,10 @@ func NewDefaultEmbedder(modelPath string) (Embedder, error) {
 }
 
 func (e *onnxEmbedder) Dims() int { return onnxDims }
+
+// defaultIndex pairs this embedder with the index built for its own
+// (384-dim) vectors — see indexProvider in embedder.go.
+func (e *onnxEmbedder) defaultIndex() []byte { return onnxIndexData }
 
 func (e *onnxEmbedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	e.mu.Lock()
