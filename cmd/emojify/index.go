@@ -72,7 +72,27 @@ const (
 	penaltyThresholdSigma = 1.5
 	penaltyMultiplier     = 0.85
 	emojibaseVersion      = "17.0.0"
+
+	// minIndexCandidates is a defensive floor on the number of blobs that
+	// survive filtering before we build and write an index. Real candidate
+	// counts are 1,536 by default and 1,806 with --include-flags; a
+	// degenerate upstream response (an empty array, schema drift in
+	// emojibase-data) would otherwise produce a structurally valid but
+	// tiny/empty index, silently written as the real baked artifact with
+	// only a stderr line as signal. 1000 leaves comfortable margin below
+	// both real counts while still catching a meaningfully broken fetch.
+	minIndexCandidates = 1000
 )
+
+// checkCandidateFloor rejects a candidate count too small to plausibly be a
+// real emojibase-data fetch, rather than silently building/writing a
+// structurally valid but tiny/degenerate index.
+func checkCandidateFloor(n int) error {
+	if n < minIndexCandidates {
+		return fmt.Errorf("index build: only %d candidates survived filtering, want at least %d — refusing to build/write an index this small (degenerate upstream response? schema drift in emojibase-data?)", n, minIndexCandidates)
+	}
+	return nil
+}
 
 func runIndexBuild(ctx context.Context, outPath string, includeFlags bool) error {
 	entries, names, err := indexbuild.FetchEmojibaseData(ctx, emojibaseVersion)
@@ -81,6 +101,9 @@ func runIndexBuild(ctx context.Context, outPath string, includeFlags bool) error
 	}
 	blobs := indexbuild.BuildBlobs(entries, names, includeFlags)
 	fmt.Fprintf(os.Stderr, "index build: %d candidates (include-flags=%v)\n", len(blobs), includeFlags)
+	if err := checkCandidateFloor(len(blobs)); err != nil {
+		return err
+	}
 
 	emb, err := emojify.NewDefaultEmbedder("")
 	if err != nil {
