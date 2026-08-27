@@ -1,2 +1,4 @@
 /data/model.onnx
 /data/vocab.txt
+/dist/
+/emojify

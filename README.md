@@ -33,9 +33,34 @@ Exit codes: `0` output produced, `1` error, `2` nothing cleared `--min-score`.
 
 ## Docker
 
-    ./scripts/fetch-onnx-model.sh
     docker build -t emojify .
     docker run -p 8080:8080 emojify
+
+(The Dockerfile fetches the model/vocab itself during the build — unlike the
+local Go build above, no separate `fetch-onnx-model.sh` step is needed.)
+
+Pre-built multi-arch images (`linux/amd64`, `linux/arm64`) are published to
+`ghcr.io/jphastings/emojify` on every tagged release — see "Releasing"
+below. Measured resident memory under load: ~90MB; 256MB is a comfortable
+minimum for the container, 512MB for headroom.
+
+## Releasing
+
+Pushing a tag matching `v*` (e.g. `v0.1.0`) triggers `.github/workflows/release.yml`:
+[goreleaser](https://goreleaser.com) cross-compiles the static (`!onnx`)
+binary for linux/darwin/windows × amd64/arm64, plus linux/arm (`GOARM` 6 and
+7, for the Pi Zero family), and publishes them as a GitHub Release with a
+changelog and checksums. Separately, the `onnx` (production) image is built
+natively per architecture (no QEMU — see the workflow's comments for why)
+and published to `ghcr.io/jphastings/emojify` tagged with the version,
+the `major.minor`, and `latest`.
+
+    git tag v0.1.0
+    git push origin v0.1.0
+
+To dry-run the binary build locally without publishing anything:
+
+    goreleaser release --snapshot --clean
 
 ## Cross-compiling for arm64 (Raspberry Pi, etc.)
 

@@ -1,0 +1,87 @@
+version: 2
+
+project_name: emojify
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  # The onnx (production, high-quality) embedder needs cgo + a real
+  # libonnxruntime for the target platform, which goreleaser can't
+  # reasonably cross-compile for every OS/arch here — that build only
+  # ships as the ghcr.io container image (built from the Dockerfile in
+  # .github/workflows/release.yml, alongside this release, not by
+  # goreleaser). These builds are the CGO_ENABLED=0 static fallback
+  # embedder (see README's "Build" section) — a genuinely standalone
+  # single-file binary, including for the Pi Zero's ARMv6.
+  - id: emojify
+    main: ./cmd/emojify
+    binary: emojify
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+
+  # Separate build id: goarm only applies to goarch "arm", and Go doesn't
+  # support windows/arm or darwin/arm, so this is easier to keep out of
+  # the matrix above than to `ignore:` down to just the valid combination.
+  - id: emojify-arm
+    main: ./cmd/emojify
+    binary: emojify
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - arm
+    goarm:
+      - "6" # original Pi Zero / Zero W
+      - "7" # Pi Zero 2 W, Pi 2/3/4
+    ldflags:
+      - -s -w -X main.version={{ .Version }} -X main.commit={{ .Commit }} -X main.date={{ .Date }}
+
+archives:
+  - id: emojify-archive
+    ids:
+      - emojify
+      - emojify-arm
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  footer: >-
+    ## Docker image
+
+
+    A multi-arch `onnx`-tagged container image (the production, high-quality
+    embedder) is published alongside this release to
+    `ghcr.io/jphastings/emojify:{{ .Tag }}` (and `:latest`). See the
+    [README](https://github.com/jphastings/emojify#docker) for run
+    instructions. The binaries in this release use the pure-Go static
+    fallback embedder instead — see the README for what that trade-off
+    means.

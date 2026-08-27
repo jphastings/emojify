@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same ref (e.g. new pushes to a PR).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep this in sync with the Dockerfile's ONNXRUNTIME_VERSION build arg —
+  # both need a version new enough for yalue/onnxruntime_go's pinned ORT
+  # C-API requirement (see go.mod / go.sum for the resolved version).
+  ONNXRUNTIME_VERSION: "1.29.0"
+
+jobs:
+  test:
+    name: Test (static embedder, default build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "gofmt needs to be run on:"
+            echo "$out"
+            exit 1
+          fi
+
+      - run: go vet ./...
+      - run: go build ./...
+      - run: go test ./... -race -v
+
+  test-onnx:
+    name: Test (onnx embedder, production build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Static-linked, so no separate ONNX Runtime install is needed to
+      # *build* -tags onnx (yalue/onnxruntime_go dlopen()s the library at
+      # runtime, not link time) — but running the tests constructs a real
+      # onnxEmbedder, which does need it, plus the real model/vocab.
+      - name: Install ONNX Runtime
+        run: |
+          curl -fL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNXRUNTIME_VERSION}/onnxruntime-linux-x64-${ONNXRUNTIME_VERSION}.tgz" \
+            -o /tmp/ort.tgz
+          sudo tar -xzf /tmp/ort.tgz -C /usr/local --strip-components=1
+          sudo ldconfig
+
+      - name: Fetch the ONNX model + vocab
+        run: ./scripts/fetch-onnx-model.sh
+
+      - run: go vet -tags onnx ./...
+      - run: go build -tags onnx ./...
+      - run: go test -tags onnx ./... -race -v
+
+  goreleaser-check:
+    name: goreleaser snapshot build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean
+
+  docker-build-check:
+    name: Docker build (onnx image, ${{ matrix.arch }}, no push)
+    # One native runner per arch, not a QEMU multi-platform build on one
+    # runner — see release.yml's docker-build job for why (QEMU-emulated
+    # `go mod download` was found to be unreliable for this project: it
+    # crashed outright, or once silently produced a module zip that failed
+    # go.sum verification — an emulation artifact, independently confirmed
+    # against sum.golang.org, not a real dependency issue).
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false

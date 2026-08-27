@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # goreleaser creates the GitHub Release and uploads assets
+  packages: write # push the container image to ghcr.io
+
+jobs:
+  goreleaser:
+    name: Build & publish binaries (GitHub Release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # goreleaser needs full history for its changelog
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Builds the onnx (production) container image per-architecture on native
+  # runners rather than via QEMU emulation on one runner: cross-building this
+  # image under QEMU was found, while setting this up, to be genuinely
+  # unreliable — the Go toolchain's `go mod download` either crashed outright
+  # or (once) silently returned a module zip that failed go.sum verification,
+  # purely as an artifact of the emulation, not a real dependency problem
+  # (independently confirmed correct against sum.golang.org's public
+  # transparency log). That's not a risk worth taking in a pipeline that
+  # publishes real images. GitHub's arm64 Linux runners (ubuntu-24.04-arm)
+  # make native the equally-simple, actually-safe option — if that runner
+  # label is ever unavailable on this account, this job will fail with a
+  # clear "no runner matching" error; the fallback is a single QEMU/buildx
+  # job (ask for it if needed), accepting the emulation risk above.
+  docker-build:
+    name: Build onnx image (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runs-on: ubuntu-latest
+          - arch: arm64
+            runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deterministic per-arch tag, not meant for users — the
+      # docker-manifest job below combines these into the real, published
+      # tags and is the only thing that needs to find them again.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:build-${{ github.sha }}-${{ matrix.arch }}
+
+  docker-manifest:
+    name: Publish multi-arch manifest (ghcr.io)
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+
+      - name: Combine per-arch images into the published tags
+        run: |
+          set -eux
+          tag_args=()
+          while IFS= read -r line; do
+            [ -n "$line" ] && tag_args+=(--tag "$line")
+          done <<< "${{ steps.meta.outputs.tags }}"
+          docker buildx imagetools create "${tag_args[@]}" \
+            "ghcr.io/${{ github.repository }}:build-${{ github.sha }}-amd64" \
+            "ghcr.io/${{ github.repository }}:build-${{ github.sha }}-arm64"
