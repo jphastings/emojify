@@ -1,6 +1,6 @@
 # emojify
 
-Maps a short passage of text (≤300 characters) to the emoji that best fit its
+Maps a short passage of text (≤600 characters) to the emoji that best fit its
 meaning, via nearest-neighbour search over sentence embeddings.
 
 ## Build

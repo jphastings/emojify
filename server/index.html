@@ -53,6 +53,10 @@
     color: var(--ink);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    /* iOS Safari otherwise inflates text in blocks it decides are too wide,
+       which made the monospace blocks render larger than everything else. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   main {
@@ -195,6 +199,10 @@
   .docs {
     margin-top: clamp(2.25rem, 6vw, 3.25rem);
     display: grid;
+    /* minmax(0, 1fr), not the default 1fr: grid items are min-width:auto,
+       so the track would otherwise refuse to shrink below the widest
+       unbreakable string in a <pre> and push the whole page sideways. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.75rem;
   }
 
@@ -213,11 +221,24 @@
     border: 1.5px solid var(--edge);
     border-radius: 0.9rem;
     padding: 0.9rem 1.1rem;
-    overflow-x: auto;
+    /* Wrap long commands rather than making them scroll: a command you have
+       to swipe sideways to read is a command you can't copy confidently on a
+       phone. `anywhere` because these are URLs and flag-laden shell lines
+       with no convenient break points. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 0.88rem;
+    font-size: 0.86rem;
     line-height: 1.7;
     color: var(--ink);
+  }
+  /* A wrapped command should read as one command: continuation lines are
+     indented back under the text, clear of the prompt glyph. */
+  pre code {
+    display: block;
+    padding-left: 1.15em;
+    text-indent: -1.15em;
+    font: inherit;
   }
   pre .prompt, pre .verb { color: var(--ink-soft); user-select: none; }
 
@@ -252,7 +273,7 @@
 
   <form id="f" autocomplete="off">
     <label class="sr" for="t">Text to emojify</label>
-    <input id="t" type="text" name="text" maxlength="300"
+    <input id="t" type="text" name="text" maxlength="600"
            placeholder="quiet morning, strong coffee" required>
     <button type="submit" id="go">Go</button>
   </form>
@@ -269,21 +290,19 @@
   <div class="docs">
     <section>
       <h2>Run your own</h2>
-<pre><span class="prompt">$</span> docker run -p 8080:8080 ghcr.io/jphastings/emojify</pre>
+<pre><code><span class="prompt">$</span> docker run -p 8080:8080 ghcr.io/jphastings/emojify</code></pre>
     </section>
 
     <section>
       <h2>Install locally</h2>
-<pre><span class="prompt">$</span> go install github.com/jphastings/emojify/cmd/emojify@latest
-<span class="prompt">$</span> echo "happy birthday!" | emojify
-🥳</pre>
+<pre><code><span class="prompt">$</span> go install github.com/jphastings/emojify/cmd/emojify@latest</code><code><span class="prompt">$</span> echo "happy birthday!" | emojify</code><code>🥳</code></pre>
       <p class="aside">Installs the pure-Go model — small and dependency-free.
       Docker and the box above use the larger one, which is sharper on subtler phrasing.</p>
     </section>
 
     <section>
       <h2>XRPC endpoint</h2>
-<pre><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmojis?text=Awesome&amp;limit=1</pre>
+<pre><code><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmojis?text=Awesome&amp;limit=1</code></pre>
     </section>
   </div>
 
@@ -355,7 +374,7 @@
       } else if (res.status === 429) {
         say("Whoa, steady on — try again in a second.");
       } else if (body.error === "TextTooLong") {
-        say("That’s a bit long — keep it under 300 characters.");
+        say("That’s a bit long — keep it under 600 characters.");
       } else if (body.error === "NoMatch") {
         say("Nothing matched that one.");
       } else {

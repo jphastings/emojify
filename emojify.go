@@ -53,13 +53,13 @@ func WithIndex(r io.Reader) Option {
 // padding the result.
 func WithMinScore(s float32) Option { return func(c *config) { c.minScore = s } }
 
-// WithMaxRunes overrides the default 300-rune input limit.
+// WithMaxRunes overrides the default 600-rune input limit.
 func WithMaxRunes(n int) Option { return func(c *config) { c.maxRunes = n } }
 
 // New loads the embedded index and embedder. Cheap to hold, expensive to
 // create — construct once, share across goroutines.
 func New(opts ...Option) (*Matcher, error) {
-	cfg := config{maxRunes: 300}
+	cfg := config{maxRunes: 600}
 	for _, opt := range opts {
 		opt(&cfg)
 	}
