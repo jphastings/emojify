@@ -30,27 +30,28 @@ RUN set -eux; \
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+# model.onnx/vocab.txt are gitignored (scripts/fetch-onnx-model.sh populates
+# them for a local dev build) — go:embed needs them present to *compile*
+# -tags onnx, so a build from a fresh checkout (CI, Railway, this Dockerfile)
+# must fetch them first, here, before go build. Same pinned source as that
+# script; keep both in sync.
+RUN curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx" \
+        -o data/model.onnx \
+    && curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt" \
+        -o data/vocab.txt
 # Defaults to "dev" for a plain `docker build`, matching main.go's own
 # fallback — release.yml passes the real tag via --build-arg.
 ARG VERSION=dev
 RUN CGO_ENABLED=1 go build -tags onnx -ldflags "-s -w -X main.version=${VERSION}" -o /out/emojify ./cmd/emojify
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /usr/local/lib/libonnxruntime.so* /usr/local/lib/
 RUN ldconfig
 COPY --from=build /out/emojify /usr/local/bin/emojify
-# Fetched here rather than COPY'd from the host: data/model.onnx and
-# data/vocab.txt are gitignored (scripts/fetch-onnx-model.sh, run locally,
-# populates them for a dev build) — a platform building straight from this
-# git repo (Railway, a fresh clone, CI) has neither file, so COPY would fail
-# with "not found". Same pinned source as that script; keep both in sync.
-RUN mkdir -p /app/data \
-    && curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx" \
-        -o /app/data/model.onnx \
-    && curl -fL "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt" \
-        -o /app/data/vocab.txt
-ENV EMOJIFY_MODEL_PATH=/app/data/model.onnx
+# No data/ directory or EMOJIFY_MODEL_PATH needed here: model.onnx and
+# vocab.txt are go:embed'd into the binary at build time above, not loaded
+# from disk at runtime.
 # embedder_onnx.go's default lookup path is the Linux-packaged /usr/lib
 # location; ldconfig alone doesn't help since the app dlopen()s an absolute
 # path rather than a bare library name, so point it at where ORT actually
