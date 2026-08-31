@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jphastings/emojify"
@@ -39,7 +38,7 @@ func newWithLimits(matcher *emojify.Matcher, cfg limitConfig) http.Handler {
 	// "/{$}" matches the root path *exactly*; a bare "GET /" would instead
 	// act as a catch-all and serve this page for every unmatched path.
 	mux.HandleFunc("GET /{$}", h.handleIndex)
-	mux.HandleFunc("GET /xrpc/me.byjp.emojify.suggestEmoji", h.handleSuggest)
+	mux.HandleFunc("POST /xrpc/me.byjp.emojify.suggestEmoji", h.handleSuggest)
 	mux.HandleFunc("GET /healthz", h.handleHealthz)
 	mux.HandleFunc("GET /xrpc/_health", h.handleXRPCHealth)
 	mux.HandleFunc("GET /lexicons/me.byjp.emojify.suggestEmoji.json", h.handleLexicon)
@@ -55,23 +54,27 @@ func newWithLimits(matcher *emojify.Matcher, cfg limitConfig) http.Handler {
 func (h *handler) handleSuggest(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	text := r.URL.Query().Get("text")
-	if text == "" {
-		writeXRPCError(w, http.StatusBadRequest, "InvalidRequest", "text parameter is required")
+	var req suggestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeXRPCError(w, http.StatusBadRequest, "InvalidRequest", "invalid JSON request body")
+		return
+	}
+
+	if req.Text == "" {
+		writeXRPCError(w, http.StatusBadRequest, "InvalidRequest", "text field is required")
 		return
 	}
 
 	limit := defaultLimit
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		n, err := strconv.Atoi(raw)
-		if err != nil || n < 1 || n > maxLimit {
+	if req.Limit != nil {
+		if *req.Limit < 1 || *req.Limit > maxLimit {
 			writeXRPCError(w, http.StatusBadRequest, "InvalidRequest", "limit must be an integer between 1 and 5")
 			return
 		}
-		limit = n
+		limit = *req.Limit
 	}
 
-	suggestions, err := h.matcher.Suggest(r.Context(), text, limit)
+	suggestions, err := h.matcher.Suggest(r.Context(), req.Text, limit)
 	if err != nil {
 		if errors.Is(err, emojify.ErrTextTooLong) {
 			writeXRPCError(w, http.StatusBadRequest, "TextTooLong", err.Error())

@@ -3,24 +3,27 @@
   "id": "me.byjp.emojify.suggestEmoji",
   "defs": {
     "main": {
-      "type": "query",
+      "type": "procedure",
       "description": "Suggest emoji whose meaning best matches a short passage of text.",
-      "parameters": {
-        "type": "params",
-        "required": ["text"],
-        "properties": {
-          "text": {
-            "type": "string",
-            "maxGraphemes": 600,
-            "maxLength": 2400,
-            "description": "The passage of text to match, up to 600 units. Despite the maxGraphemes field name, the limit is actually enforced in Unicode code points (runes), not user-perceived graphemes — a single multi-rune grapheme cluster (e.g. a ZWJ family emoji) counts as multiple units toward it. maxLength is in UTF-8 bytes, not runes — emoji-laden input can run up to 4 bytes per rune. Note that the underlying model reads at most 256 tokens (~1300 runes of ordinary English, far fewer for punctuation-dense text); anything beyond that is ignored rather than rejected, and a long passage whose subject is a small fraction of the text tends to yield a generic suggestion."
-          },
-          "limit": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5,
-            "default": 3,
-            "description": "Maximum number of suggestions to return."
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": ["text"],
+          "properties": {
+            "text": {
+              "type": "string",
+              "maxGraphemes": 600,
+              "maxLength": 2400,
+              "description": "The passage of text to match, up to 600 units. Despite the maxGraphemes field name, the limit is actually enforced in Unicode code points (runes), not user-perceived graphemes — a single multi-rune grapheme cluster (e.g. a ZWJ family emoji) counts as multiple units toward it. maxLength is in UTF-8 bytes, not runes — emoji-laden input can run up to 4 bytes per rune. Note that the underlying model reads at most 256 tokens (~1300 runes of ordinary English, far fewer for punctuation-dense text); anything beyond that is ignored rather than rejected, and a long passage whose subject is a small fraction of the text tends to yield a generic suggestion."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5,
+              "default": 3,
+              "description": "Maximum number of suggestions to return."
+            }
           }
         }
       },

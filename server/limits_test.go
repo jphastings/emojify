@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,13 +16,39 @@ func TestCORSHeaderOnXRPCRoute(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there")
+	resp, err := http.Post(srv.URL+"/xrpc/me.byjp.emojify.suggestEmoji", "application/json", strings.NewReader(`{"text":"hello there"}`))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	defer resp.Body.Close()
 	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
 		t.Errorf("Access-Control-Allow-Origin = %q, want \"*\"", got)
+	}
+}
+
+func TestCORSPreflightOnXRPCRoute(t *testing.T) {
+	handler := New(newTestMatcher(t))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodOptions, srv.URL+"/xrpc/me.byjp.emojify.suggestEmoji", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("OPTIONS: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status = %d, want 204", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want \"*\"", got)
+	}
+	if got := resp.Header.Get("Access-Control-Allow-Methods"); got != "POST" {
+		t.Errorf("Access-Control-Allow-Methods = %q, want %q", got, "POST")
 	}
 }
 
@@ -31,16 +58,17 @@ func TestRateLimitReturns429WhenExceeded(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	url := srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there"
-	first, err := http.Get(url)
+	url := srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji"
+	body := `{"text":"hello there"}`
+	first, err := http.Post(url, "application/json", strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	first.Body.Close()
 
-	second, err := http.Get(url)
+	second, err := http.Post(url, "application/json", strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	defer second.Body.Close()
 	if second.StatusCode != http.StatusTooManyRequests {
@@ -85,7 +113,8 @@ func TestRateLimitConcurrentBurstFromSameIP(t *testing.T) {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				req := httptest.NewRequest(http.MethodGet, "/xrpc/me.byjp.emojify.suggestEmoji?text=hello+there", nil)
+				req := httptest.NewRequest(http.MethodPost, "/xrpc/me.byjp.emojify.suggestEmoji", strings.NewReader(`{"text":"hello there"}`))
+				req.Header.Set("Content-Type", "application/json")
 				req.RemoteAddr = fmt.Sprintf("203.0.113.%d:12345", attempt) // same simulated client IP within an attempt, unique across attempts
 				rec := httptest.NewRecorder()
 				<-start

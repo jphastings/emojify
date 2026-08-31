@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jphastings/emojify"
@@ -29,9 +30,9 @@ func TestSuggestEmojiRoute(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=such+a+beautiful+sunny+afternoon&limit=3")
+	resp, err := http.Post(srv.URL+"/xrpc/me.byjp.emojify.suggestEmoji", "application/json", strings.NewReader(`{"text":"such a beautiful sunny afternoon","limit":3}`))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -63,9 +64,9 @@ func TestSuggestEmojiMissingText(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji")
+	resp, err := http.Post(srv.URL+"/xrpc/me.byjp.emojify.suggestEmoji", "application/json", strings.NewReader(`{}`))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 400 || resp.StatusCode >= 500 {
@@ -128,9 +129,9 @@ func TestSuggestEmojiInternalError(t *testing.T) {
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/xrpc/me.byjp.emojify.suggestEmoji?text=hello")
+	resp, err := http.Post(srv.URL+"/xrpc/me.byjp.emojify.suggestEmoji", "application/json", strings.NewReader(`{"text":"hello"}`))
 	if err != nil {
-		t.Fatalf("GET: %v", err)
+		t.Fatalf("POST: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusInternalServerError {

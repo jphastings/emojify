@@ -24,6 +24,16 @@ const bucketCacheSize = 4096
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		if r.Method == http.MethodOptions {
+			// suggestEmoji moved from GET+query (a CORS "simple request") to
+			// POST+JSON, which browsers preflight: without answering OPTIONS
+			// here, every cross-origin caller's preflight would 405 before
+			// the real request ever went out.
+			w.Header().Set("Access-Control-Allow-Methods", "POST")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -106,7 +116,10 @@ func withBoundedConcurrencyLimits(workers int, queueWait time.Duration, next htt
 	})
 }
 
-const maxRequestBodyBytes = 4096 // suggestEmoji is a GET with no real body; this is a defensive ceiling, not a real limit
+// maxRequestBodyBytes bounds the JSON body of POST /xrpc/... requests. The
+// lexicon caps text at 2400 UTF-8 bytes; this leaves headroom for the JSON
+// envelope and the limit field without needing to track that figure exactly.
+const maxRequestBodyBytes = 4096
 
 func withMaxBytes(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

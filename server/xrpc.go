@@ -26,6 +26,11 @@ func writeXRPCError(w http.ResponseWriter, status int, name, message string) {
 	json.NewEncoder(w).Encode(xrpcError{Error: name, Message: message})
 }
 
+type suggestRequest struct {
+	Text  string `json:"text"`
+	Limit *int   `json:"limit"`
+}
+
 type suggestion struct {
 	Emoji string `json:"emoji"`
 	Name  string `json:"name"`

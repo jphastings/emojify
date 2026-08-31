@@ -310,7 +310,10 @@
 
     <section>
       <h2>XRPC endpoint</h2>
-<pre><code><span class="verb">GET</span> /xrpc/me.byjp.emojify.suggestEmoji?text=Awesome&amp;limit=1</code></pre>
+<pre><code><span class="verb">POST</span> /xrpc/me.byjp.emojify.suggestEmoji
+Content-Type: application/json
+
+{"text": "Awesome", "limit": 1}</code></pre>
     </section>
   </div>
 
@@ -373,9 +376,11 @@
     mark.classList.add("thinking");
     say("");
     try {
-      var res = await fetch(
-        "/xrpc/me.byjp.emojify.suggestEmoji?limit=1&text=" + encodeURIComponent(text)
-      );
+      var res = await fetch("/xrpc/me.byjp.emojify.suggestEmoji", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text, limit: 1 }),
+      });
       var body = await res.json().catch(function () { return {}; });
       if (res.ok && body.suggestions && body.suggestions.length) {
         show(body.suggestions[0].emoji, body.suggestions[0].name);

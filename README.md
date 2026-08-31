@@ -124,7 +124,8 @@ run the same command there:
 
 ## Server
 
-`GET /xrpc/me.byjp.emojify.suggestEmoji?text=...&limit=3` — see
+`POST /xrpc/me.byjp.emojify.suggestEmoji` with a JSON body
+(`{"text":"...","limit":3}`) — see
 `lexicons/me/byjp/emojify/suggestEmoji.json` for the full schema (served at
 `GET /lexicons/me.byjp.emojify.suggestEmoji.json`). Also: `GET /healthz`,
 `GET /xrpc/_health`, and a small demo page at `GET /`.
