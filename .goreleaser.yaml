@@ -188,9 +188,9 @@ homebrew_casks:
     # otherwise quarantine the binary and macOS would refuse to run it.
     hooks:
       post:
-        install: |
-          if system_command("/usr/bin/xattr", args: ["-h"], print_stderr: false).exit_status == 0
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/emojify"]
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/emojify"]
           end
     caveats: |
       Uses a small built-in embedding model by default. `brew install onnxruntime`
